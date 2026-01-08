@@ -1,0 +1,220 @@
+/* ancho base del root (lo puedes ajustar si querés full width) */
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
+
+/* === Modal Cargar Resultado (tipo AppSheet) === */
+
+.crm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45); /* overlay oscuro */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 40;
+}
+
+.crm-modal {
+  width: 360px;
+  max-height: 90vh;
+  background: #ffffff;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.35);
+  display: flex;
+  flex-direction: column;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+}
+
+/* header azul */
+
+.crm-header {
+  background: #0b5ed7; /* azul tipo AppSheet */
+  color: #ffffff;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.crm-back-btn {
+  border: none;
+  background: transparent;
+  color: #ffffff;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+
+.crm-header-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.crm-header-spacer {
+  flex: 1;
+}
+
+/* cuerpo */
+
+.crm-body {
+  padding: 14px 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 0.85rem;
+}
+
+.crm-section {
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+}
+
+.crm-section:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.crm-main-label {
+  margin: 0 0 4px;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.crm-match-title {
+  margin: 0;
+  font-weight: 600;
+  color: #111827;
+}
+
+.crm-subinfo {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+/* campos */
+
+.crm-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.crm-field-label {
+  font-size: 0.8rem;
+  color: #4b5563;
+}
+
+.crm-optional {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.crm-input {
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.crm-input:focus {
+  border-color: #0b5ed7;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.35);
+}
+
+/* error */
+
+.crm-error {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  color: #dc2626;
+}
+
+/* footer */
+
+.crm-footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 16px 12px;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+  margin-top: 6px;
+}
+
+.crm-btn {
+  border-radius: 999px;
+  border: 1px solid transparent;
+  padding: 6px 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.crm-btn-primary {
+  background: #0b5ed7;
+  color: #ffffff;
+}
+
+.crm-btn-primary:hover {
+  background: #0a53be;
+}
+
+.crm-btn-secondary {
+  background: #ffffff;
+  border-color: #d1d5db;
+  color: #4b5563;
+}
+
+.crm-btn-secondary:hover {
+  background: #f3f4f6;
+}
+
+.crm-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
