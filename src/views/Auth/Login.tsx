@@ -1,151 +1,114 @@
-// src/views/Auth/Login.tsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useState } from "react";
 import { login } from "../../services/auth";
 import { activarNotificaciones, registerPushToken } from "../../push";
 
-interface LoginProps {
+type LoginProps = {
   onLoggedIn: () => void;
-}
+};
 
 const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const [jwt, setJwt] = useState<string>(() => localStorage.getItem("token") || "");
-  const [fcmToken, setFcmToken] = useState<string>(() => localStorage.getItem("fcm_token") || "");
-  const hasJwt = useMemo(() => !!jwt && jwt.length > 20, [jwt]);
-  const hasFcm = useMemo(() => !!fcmToken && fcmToken.length > 20, [fcmToken]);
+  const [msg, setMsg] = useState<string>("");
+  const [error, setError] = useState<string>("");
 
-  // Si tenemos ambos, registramos en backend
-  useEffect(() => {
-    if (!hasJwt || !hasFcm) return;
+  const [fcmToken, setFcmToken] = useState<string>("");
 
-    (async () => {
-      try {
-        await registerPushToken(jwt, fcmToken);
-        console.log("✅ FCM token registrado en backend");
-      } catch (e) {
-        console.error("❌ Error registrando FCM en backend:", e);
-      }
-    })();
-  }, [hasJwt, hasFcm, jwt, fcmToken]);
-
-  // ✅ Debe ejecutarse por click sí o sí
-  const pedirPermisoNotificaciones = async () => {
-    setError(null);
-    try {
-      const token = await activarNotificaciones();
-      setFcmToken(token);
-      localStorage.setItem("fcm_token", token);
-
-      // si ya estás logueado, lo registra al toque
-      if (hasJwt) {
-        await registerPushToken(jwt, token);
-        console.log("✅ Registrado al backend (post-click)");
-      }
-
-      alert("Notificaciones activadas ✅");
-    } catch (err: any) {
-      console.error(err);
-      setError(err?.message || "Error activando notificaciones");
-      alert("Error activando notificaciones");
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+    setError("");
+    setMsg("");
     setLoading(true);
 
     try {
-      const emailClean = email.trim().toLowerCase();
+      const resp = await login(email.trim());
+      // tu login() ya guarda el JWT en localStorage ("token")
 
-      const data = await login(emailClean); // guarda token en localStorage
-      const token = data?.token || localStorage.getItem("token") || "";
-      setJwt(token);
+      setMsg(resp?.login_url ? "📩 Link enviado al email (si aplica)" : "✅ Login OK");
 
-      // si ya tenés fcmToken del celu/pc, registra ahora
-      if (token && fcmToken) {
-        await registerPushToken(token, fcmToken);
-      }
-
+      // si tu backend devuelve token directo, ya podés entrar
       onLoggedIn();
     } catch (err: any) {
-      console.error(err);
-      setError("No se pudo iniciar sesión. Verificá el correo.");
+      setError(err?.message || "Error logueando");
     } finally {
       setLoading(false);
     }
-  };
+  }
+
+  async function handleActivarNotificaciones() {
+    setError("");
+    setMsg("");
+
+    try {
+      const jwt = localStorage.getItem("token") || "";
+      if (!jwt) throw new Error("No hay JWT en localStorage. Logueate primero.");
+
+      const token = await activarNotificaciones();
+      setFcmToken(token);
+
+      // 🔥 ACÁ está lo importante: registrar el token en tu backend
+      const r = await registerPushToken(jwt, token);
+
+      setMsg(`✅ Notificaciones activadas y token registrado (jugador_id=${r?.jugador_id ?? "?"})`);
+    } catch (err: any) {
+      setError(err?.message || "Error activando notificaciones");
+    }
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-100">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-sm p-6">
-        <h1 className="text-xl font-semibold text-center mb-2">
-          Ranking Pádel – Panel Web
-        </h1>
-
-        <p className="text-xs text-slate-500 text-center mb-6">
-          Iniciá sesión con tu correo real (el que está cargado en el sistema).
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow p-5">
+        <h1 className="text-xl font-bold">Login</h1>
+        <p className="text-sm text-slate-500 mt-1">
+          Ingresá tu email para obtener acceso.
         </p>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">
-              Correo electrónico
-            </label>
-            <input
-              type="email"
-              placeholder="ejemplo@correo.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-            />
-            <p className="text-[10px] text-slate-400 mt-1 text-right">
-              len: {email.length}
-            </p>
-          </div>
-
-          {error && (
-            <p className="text-xs text-red-500 text-center">{error}</p>
-          )}
+        <form onSubmit={handleLogin} className="mt-4 space-y-3">
+          <input
+            className="w-full border rounded-xl p-3 outline-none"
+            placeholder="tu@email.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            type="email"
+            required
+          />
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full rounded-xl p-3 font-semibold bg-black text-white disabled:opacity-60"
           >
-            {loading ? "Ingresando…" : "Entrar"}
+            {loading ? "Ingresando..." : "Ingresar"}
           </button>
-
-          <button
-            type="button"
-            onClick={pedirPermisoNotificaciones}
-            className="w-full rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            Activar notificaciones
-          </button>
-
-          {(hasFcm || hasJwt) && (
-            <div className="pt-2 space-y-1">
-              {hasJwt && (
-                <p className="text-[10px] text-slate-500 text-center break-all">
-                  ✅ JWT listo: {jwt.slice(0, 20)}...
-                </p>
-              )}
-              {hasFcm && (
-                <p className="text-[10px] text-slate-500 text-center break-all">
-                  ✅ FCM listo: {fcmToken.slice(0, 25)}...
-                </p>
-              )}
-            </div>
-          )}
         </form>
+
+        <div className="mt-4 flex gap-2">
+          <button
+            onClick={handleActivarNotificaciones}
+            className="flex-1 rounded-xl p-3 font-semibold border"
+          >
+            🔔 Activar notificaciones
+          </button>
+        </div>
+
+        {msg && (
+          <p className="mt-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl p-3">
+            {msg}
+          </p>
+        )}
+
+        {error && (
+          <p className="mt-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl p-3">
+            {error}
+          </p>
+        )}
+
+        {fcmToken && (
+          <p className="mt-3 text-[10px] text-slate-500 text-center break-all">
+            ✅ FCM listo: {fcmToken.slice(0, 30)}...
+          </p>
+        )}
       </div>
     </div>
   );
