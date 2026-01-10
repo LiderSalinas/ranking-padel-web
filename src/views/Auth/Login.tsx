@@ -10,39 +10,39 @@ interface LoginProps {
 const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [loadingPush, setLoadingPush] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // (debug opcional) para ver rápidamente si generó token
+  // debug UI
   const [fcmToken, setFcmToken] = useState<string | null>(null);
+  const [pushStatus, setPushStatus] = useState<string | null>(null);
 
-  // ✅ AGREGADO: activar + registrar token en backend
   const pedirPermisoNotificaciones = async () => {
     setError(null);
-    setLoadingPush(true);
+    setPushStatus(null);
 
     try {
-      // 1) Genera token FCM
-      const newFcmToken = await activarNotificaciones();
-      setFcmToken(newFcmToken);
+      const token = await activarNotificaciones();
+      setFcmToken(token);
 
-      // 2) Recupera JWT para autenticar el endpoint /push/token
+      // ⚠️ Necesitamos JWT para registrar el token en backend
       const jwt = localStorage.getItem("token");
       if (!jwt) {
-        alert("Primero iniciá sesión para poder registrar el token en el backend.");
+        setPushStatus("⚠️ Notificaciones OK, pero falta login (no hay JWT).");
+        alert("Tenés que loguearte primero para registrar el token en el backend.");
         return;
       }
 
-      // 3) Registra el token en tu backend (DB)
-      await registerPushToken(jwt, newFcmToken);
+      setPushStatus("⏳ Registrando token en backend...");
+      await registerPushToken(jwt, token);
+      setPushStatus("✅ Token registrado. Este dispositivo ya puede recibir push.");
 
-      console.log("✅ FCM token registrado en backend:", newFcmToken);
-      alert("✅ Notificaciones activadas y registradas");
+      // Debug rápido
+      console.log("✅ FCM registrado en backend:", token);
     } catch (err: any) {
       console.error(err);
+      setPushStatus(null);
+      setError(err?.message || "Error activando notificaciones");
       alert(err?.message || "Error activando notificaciones");
-    } finally {
-      setLoadingPush(false);
     }
   };
 
@@ -52,11 +52,9 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
     setLoading(true);
 
     try {
-      // ✅ normalizar email para evitar espacios/mayúsculas (clave en móviles)
       const emailClean = email.trim().toLowerCase();
-
-      await login(emailClean); // ← llama al backend y guarda token
-      onLoggedIn(); // ← avisa al App que ya estamos dentro
+      await login(emailClean); // guarda token en localStorage
+      onLoggedIn();
     } catch (err: any) {
       console.error(err);
       setError("No se pudo iniciar sesión. Verificá el correo.");
@@ -91,8 +89,6 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
               spellCheck={false}
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             />
-
-            {/* debug rápido */}
             <p className="text-[10px] text-slate-400 mt-1 text-right">
               len: {email.length}
             </p>
@@ -108,17 +104,19 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
             {loading ? "Ingresando…" : "Entrar"}
           </button>
 
-          {/* ✅ Botón para que Chrome muestre el popup y además registre en backend */}
           <button
             type="button"
             onClick={pedirPermisoNotificaciones}
-            disabled={loadingPush}
-            className="w-full rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
           >
-            {loadingPush ? "Activando…" : "Activar notificaciones"}
+            Activar notificaciones
           </button>
 
-          {/* ✅ Debug opcional: muestra token generado (útil en móvil) */}
+          {/* Debug visual */}
+          {pushStatus && (
+            <p className="text-[12px] text-slate-600 text-center">{pushStatus}</p>
+          )}
+
           {fcmToken && (
             <p className="text-[10px] text-slate-500 text-center break-all">
               ✅ FCM listo: {fcmToken.slice(0, 25)}...
