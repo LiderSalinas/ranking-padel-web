@@ -1,5 +1,5 @@
 // src/views/Auth/Login.tsx
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { login } from "../../services/auth";
 import { activarNotificaciones, registerPushToken } from "../../push";
 
@@ -12,37 +12,44 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // debug UI
-  const [fcmToken, setFcmToken] = useState<string | null>(null);
-  const [pushStatus, setPushStatus] = useState<string | null>(null);
+  const [jwt, setJwt] = useState<string>(() => localStorage.getItem("token") || "");
+  const [fcmToken, setFcmToken] = useState<string>(() => localStorage.getItem("fcm_token") || "");
+  const hasJwt = useMemo(() => !!jwt && jwt.length > 20, [jwt]);
+  const hasFcm = useMemo(() => !!fcmToken && fcmToken.length > 20, [fcmToken]);
 
+  // Si tenemos ambos, registramos en backend
+  useEffect(() => {
+    if (!hasJwt || !hasFcm) return;
+
+    (async () => {
+      try {
+        await registerPushToken(jwt, fcmToken);
+        console.log("✅ FCM token registrado en backend");
+      } catch (e) {
+        console.error("❌ Error registrando FCM en backend:", e);
+      }
+    })();
+  }, [hasJwt, hasFcm, jwt, fcmToken]);
+
+  // ✅ Debe ejecutarse por click sí o sí
   const pedirPermisoNotificaciones = async () => {
     setError(null);
-    setPushStatus(null);
-
     try {
       const token = await activarNotificaciones();
       setFcmToken(token);
+      localStorage.setItem("fcm_token", token);
 
-      // ⚠️ Necesitamos JWT para registrar el token en backend
-      const jwt = localStorage.getItem("token");
-      if (!jwt) {
-        setPushStatus("⚠️ Notificaciones OK, pero falta login (no hay JWT).");
-        alert("Tenés que loguearte primero para registrar el token en el backend.");
-        return;
+      // si ya estás logueado, lo registra al toque
+      if (hasJwt) {
+        await registerPushToken(jwt, token);
+        console.log("✅ Registrado al backend (post-click)");
       }
 
-      setPushStatus("⏳ Registrando token en backend...");
-      await registerPushToken(jwt, token);
-      setPushStatus("✅ Token registrado. Este dispositivo ya puede recibir push.");
-
-      // Debug rápido
-      console.log("✅ FCM registrado en backend:", token);
+      alert("Notificaciones activadas ✅");
     } catch (err: any) {
       console.error(err);
-      setPushStatus(null);
       setError(err?.message || "Error activando notificaciones");
-      alert(err?.message || "Error activando notificaciones");
+      alert("Error activando notificaciones");
     }
   };
 
@@ -53,7 +60,16 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
 
     try {
       const emailClean = email.trim().toLowerCase();
-      await login(emailClean); // guarda token en localStorage
+
+      const data = await login(emailClean); // guarda token en localStorage
+      const token = data?.token || localStorage.getItem("token") || "";
+      setJwt(token);
+
+      // si ya tenés fcmToken del celu/pc, registra ahora
+      if (token && fcmToken) {
+        await registerPushToken(token, fcmToken);
+      }
+
       onLoggedIn();
     } catch (err: any) {
       console.error(err);
@@ -69,6 +85,7 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
         <h1 className="text-xl font-semibold text-center mb-2">
           Ranking Pádel – Panel Web
         </h1>
+
         <p className="text-xs text-slate-500 text-center mb-6">
           Iniciá sesión con tu correo real (el que está cargado en el sistema).
         </p>
@@ -94,7 +111,9 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
             </p>
           </div>
 
-          {error && <p className="text-xs text-red-500 text-center">{error}</p>}
+          {error && (
+            <p className="text-xs text-red-500 text-center">{error}</p>
+          )}
 
           <button
             type="submit"
@@ -112,15 +131,19 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
             Activar notificaciones
           </button>
 
-          {/* Debug visual */}
-          {pushStatus && (
-            <p className="text-[12px] text-slate-600 text-center">{pushStatus}</p>
-          )}
-
-          {fcmToken && (
-            <p className="text-[10px] text-slate-500 text-center break-all">
-              ✅ FCM listo: {fcmToken.slice(0, 25)}...
-            </p>
+          {(hasFcm || hasJwt) && (
+            <div className="pt-2 space-y-1">
+              {hasJwt && (
+                <p className="text-[10px] text-slate-500 text-center break-all">
+                  ✅ JWT listo: {jwt.slice(0, 20)}...
+                </p>
+              )}
+              {hasFcm && (
+                <p className="text-[10px] text-slate-500 text-center break-all">
+                  ✅ FCM listo: {fcmToken.slice(0, 25)}...
+                </p>
+              )}
+            </div>
           )}
         </form>
       </div>
