@@ -1,5 +1,5 @@
 // src/views/Auth/Login.tsx
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { login } from "../../services/auth";
 import { activarNotificaciones, registerPushToken } from "../../push";
 
@@ -10,54 +10,41 @@ interface LoginProps {
 const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingPush, setLoadingPush] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ guardamos el FCM token cuando el usuario acepta permisos
+  // (debug opcional) para ver rápidamente si generó token
   const [fcmToken, setFcmToken] = useState<string | null>(null);
 
-  // ✅ tu JWT real (según src/services/auth.ts)
-  const getJwt = () => localStorage.getItem("token");
-
-  // ✅ Click explícito para que el navegador muestre el popup
+  // ✅ AGREGADO: activar + registrar token en backend
   const pedirPermisoNotificaciones = async () => {
+    setError(null);
+    setLoadingPush(true);
+
     try {
-      setError(null);
+      // 1) Genera token FCM
+      const newFcmToken = await activarNotificaciones();
+      setFcmToken(newFcmToken);
 
-      // Esto devuelve el FCM token (NO es el JWT)
-      const token = await activarNotificaciones();
-      setFcmToken(token);
-
-      console.log("🔥 FCM TOKEN:", token);
-      alert(token ? token : "No se generó token (aceptaste permiso?)");
-
-      // Si ya hay JWT, registramos al toque en backend
-      const jwt = getJwt();
-      if (jwt && token) {
-        await registerPushToken(jwt, token);
-        console.log("✅ Push token registrado en backend");
+      // 2) Recupera JWT para autenticar el endpoint /push/token
+      const jwt = localStorage.getItem("token");
+      if (!jwt) {
+        alert("Primero iniciá sesión para poder registrar el token en el backend.");
+        return;
       }
+
+      // 3) Registra el token en tu backend (DB)
+      await registerPushToken(jwt, newFcmToken);
+
+      console.log("✅ FCM token registrado en backend:", newFcmToken);
+      alert("✅ Notificaciones activadas y registradas");
     } catch (err: any) {
       console.error(err);
-      setError(err?.message || "No se pudieron activar las notificaciones.");
+      alert(err?.message || "Error activando notificaciones");
+    } finally {
+      setLoadingPush(false);
     }
   };
-
-  // ✅ Si el usuario activó notificaciones antes o después del login:
-  // cuando exista JWT + FCM, registramos.
-  useEffect(() => {
-    const jwt = getJwt();
-    if (!jwt) return;
-    if (!fcmToken) return;
-
-    (async () => {
-      try {
-        await registerPushToken(jwt, fcmToken);
-        console.log("✅ Push token registrado en backend (useEffect)");
-      } catch (err) {
-        console.error(err);
-      }
-    })();
-  }, [fcmToken]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,17 +52,11 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
     setLoading(true);
 
     try {
+      // ✅ normalizar email para evitar espacios/mayúsculas (clave en móviles)
       const emailClean = email.trim().toLowerCase();
 
-      await login(emailClean); // guarda JWT en localStorage("token")
-      onLoggedIn();
-
-      // Si ya teníamos FCM token, lo registramos ahora (ya existe JWT)
-      const jwt = getJwt();
-      if (jwt && fcmToken) {
-        await registerPushToken(jwt, fcmToken);
-        console.log("✅ Push token registrado en backend (post-login)");
-      }
+      await login(emailClean); // ← llama al backend y guarda token
+      onLoggedIn(); // ← avisa al App que ya estamos dentro
     } catch (err: any) {
       console.error(err);
       setError("No se pudo iniciar sesión. Verificá el correo.");
@@ -111,6 +92,7 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             />
 
+            {/* debug rápido */}
             <p className="text-[10px] text-slate-400 mt-1 text-right">
               len: {email.length}
             </p>
@@ -126,14 +108,17 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
             {loading ? "Ingresando…" : "Entrar"}
           </button>
 
+          {/* ✅ Botón para que Chrome muestre el popup y además registre en backend */}
           <button
             type="button"
             onClick={pedirPermisoNotificaciones}
-            className="w-full rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            disabled={loadingPush}
+            className="w-full rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Activar notificaciones
+            {loadingPush ? "Activando…" : "Activar notificaciones"}
           </button>
 
+          {/* ✅ Debug opcional: muestra token generado (útil en móvil) */}
           {fcmToken && (
             <p className="text-[10px] text-slate-500 text-center break-all">
               ✅ FCM listo: {fcmToken.slice(0, 25)}...
