@@ -22,7 +22,7 @@ import { logout } from "./services/auth";
 import CargarResultado from "./CargarResultado";
 import RankingView from "./views/Ranking";
 import JugadoresView from "./views/Jugadores";
-import { activarNotificaciones } from "./push";
+import { activarNotificaciones, registerPushToken } from "./push"; // ✅ CAMBIO: agregar registerPushToken
 
 // Helper chiquito para mostrar 1/12, etc.
 function formatFecha(iso: string): string {
@@ -287,11 +287,24 @@ const DesafiosView: React.FC<{
               type="button"
               onClick={async () => {
                 try {
-                  const token = await activarNotificaciones();
-                  alert(token ? token : "No se pudo generar token");
-                } catch (e) {
+                  const jwt = localStorage.getItem("token");
+                  if (!jwt) {
+                    alert("No hay sesión activa (token). Volvé a loguearte.");
+                    return;
+                  }
+
+                  const fcmToken = await activarNotificaciones();
+
+                  // ✅ CAMBIO: registrar token en backend (Neon)
+                  await registerPushToken(jwt, fcmToken);
+
+                  // debug opcional
+                  localStorage.setItem("last_fcm_token", fcmToken);
+
+                  alert("✅ Notificaciones activadas y token registrado.");
+                } catch (e: any) {
                   console.error(e);
-                  alert("Error activando notificaciones");
+                  alert(e?.message || "Error activando notificaciones");
                 }
               }}
               className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-indigo-600 text-white shadow-md hover:bg-indigo-700 active:scale-[0.96] transition"
