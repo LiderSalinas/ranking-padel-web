@@ -1,4 +1,3 @@
-// src/firebase.ts
 import { initializeApp } from "firebase/app";
 import { getMessaging } from "firebase/messaging";
 
@@ -11,8 +10,5 @@ const firebaseConfig = {
   appId: "1:991249039996:web:b67f0afbb90dfad6167ff9",
 };
 
-// ✅ esto es lo que tu push.ts necesita
 export const app = initializeApp(firebaseConfig);
-
-// (opcional) si querés usarlo directo en otro lado
 export const messaging = getMessaging(app);

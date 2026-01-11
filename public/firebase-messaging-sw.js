@@ -1,7 +1,11 @@
 /* public/firebase-messaging-sw.js */
-importScripts("https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js");
-importScripts("https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js");
+/* eslint-disable no-undef */
+/* global importScripts, firebase, clients, self */
 
+importScripts("https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js");
+importScripts("https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js");
+
+// ✅ Pegá tu config real (la misma de src/firebase.ts)
 firebase.initializeApp({
   apiKey: "AIzaSyDA1HhTOIe3vfVu86l7AUMi9eVS_k2tpXw",
   authDomain: "ranking-padel-oficial.firebaseapp.com",
@@ -13,36 +17,55 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// ✅ cuando llega push con la app cerrada o en background
+// ✅ BACKGROUND: cuando la app está cerrada o en segundo plano
 messaging.onBackgroundMessage((payload) => {
-  const title = payload?.notification?.title || "Ranking Pádel";
-  const options = {
-    body: payload?.notification?.body || "",
-    icon: "/icon.png",
-    data: payload?.data || {},
-  };
+  console.log("[SW] onBackgroundMessage:", payload);
 
-  self.registration.showNotification(title, options);
+  const title =
+    payload?.notification?.title ||
+    payload?.data?.title ||
+    "Ranking Pádel";
+
+  const body =
+    payload?.notification?.body ||
+    payload?.data?.body ||
+    "Tenés una nueva notificación";
+
+  const desafioId = payload?.data?.desafio_id;
+  const url = desafioId
+    ? `/?open_desafio=${encodeURIComponent(desafioId)}`
+    : "/";
+
+  self.registration.showNotification(title, {
+    body,
+    data: { url },
+  });
 });
 
-// ✅ al tocar la notificación, abrir la app en una URL que vos controlás
+// ✅ Click en notificación: abrir/enfocar la app en el detalle
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
-  const data = event.notification?.data || {};
-  const desafioId = data?.desafio_id;
-
-  // si mandás desafio_id, abrimos directo a ese desafío
-  const url = desafioId ? `/?open_desafio=${encodeURIComponent(desafioId)}` : "/";
+  const url = event.notification?.data?.url || "/";
 
   event.waitUntil(
-    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
-      // si ya hay pestaña abierta, enfocarla
-      for (const client of clientList) {
-        if ("focus" in client) return client.focus();
+    (async () => {
+      const allClients = await clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+
+      for (const client of allClients) {
+        if ("focus" in client) {
+          await client.focus();
+          if ("navigate" in client) await client.navigate(url);
+          return;
+        }
       }
-      // si no, abrir nueva
-      if (clients.openWindow) return clients.openWindow(url);
-    })
+
+      if (clients.openWindow) {
+        await clients.openWindow(url);
+      }
+    })()
   );
 });
