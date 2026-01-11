@@ -1,6 +1,6 @@
 // src/push.ts
 import { getMessaging, getToken } from "firebase/messaging";
-import { app } from "./firebase"; // asumimos que tu firebase.ts exporta `app`
+import { app } from "./firebase";
 
 const API_URL = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
 const VAPID_KEY = import.meta.env.VITE_VAPID_KEY as string;
@@ -19,7 +19,7 @@ export async function activarNotificaciones(): Promise<string> {
     throw new Error("Permiso de notificaciones denegado");
   }
 
-  // Registramos el SW (tiene que estar en /public/firebase-messaging-sw.js)
+  // ✅ el SW TIENE que existir en /public/firebase-messaging-sw.js
   const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
 
   const messaging = getMessaging(app);
@@ -55,4 +55,16 @@ export async function registerPushToken(jwt: string, fcmToken: string) {
   }
 
   return res.json();
+}
+
+// ✅ NUEVO: botón “🔔” hace TODO (obtiene token + guarda en Neon)
+export async function activarNotificacionesYGuardar(): Promise<string> {
+  const jwt = localStorage.getItem("token");
+  if (!jwt) throw new Error("No hay sesión activa (token). Volvé a loguearte.");
+
+  const fcmToken = await activarNotificaciones();
+  await registerPushToken(jwt, fcmToken);
+
+  localStorage.setItem("last_fcm_token", fcmToken);
+  return fcmToken;
 }

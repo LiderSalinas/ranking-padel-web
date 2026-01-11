@@ -2,6 +2,7 @@
 import React, {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ChangeEvent,
   type FormEvent,
@@ -22,7 +23,9 @@ import { logout } from "./services/auth";
 import CargarResultado from "./CargarResultado";
 import RankingView from "./views/Ranking";
 import JugadoresView from "./views/Jugadores";
-import { activarNotificaciones, registerPushToken } from "./push"; // ✅ CAMBIO: agregar registerPushToken
+
+// ✅ CAMBIO: usar la función que activa + guarda token en backend
+import { activarNotificacionesYGuardar } from "./push";
 
 // Helper chiquito para mostrar 1/12, etc.
 function formatFecha(iso: string): string {
@@ -67,7 +70,9 @@ const DesafiosView: React.FC<{
   onLogout: () => void;
   headerTitle: string;
   headerSubtitle: string;
-}> = ({ onLogout, headerTitle, headerSubtitle }) => {
+  openDesafioId?: number | null; // ✅ nuevo
+  clearOpenDesafio?: () => void; // ✅ nuevo
+}> = ({ onLogout, headerTitle, headerSubtitle, openDesafioId, clearOpenDesafio }) => {
   const [items, setItems] = useState<Desafio[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -89,6 +94,10 @@ const DesafiosView: React.FC<{
   // Modal “Cargar resultado”
   const [desafioSeleccionado, setDesafioSeleccionado] =
     useState<Desafio | null>(null);
+
+  // ✅ Modal “Detalle desafío” (para click desde push)
+  const [desafioDetalle, setDesafioDetalle] = useState<Desafio | null>(null);
+  const openHandledRef = useRef<number | null>(null);
 
   const cargarDesafios = async () => {
     try {
@@ -117,6 +126,32 @@ const DesafiosView: React.FC<{
     void cargarDesafios();
     void cargarParejas();
   }, []);
+
+  // ✅ Si viene openDesafioId (por notificación), abrimos modal detalle
+  useEffect(() => {
+    if (!openDesafioId) return;
+
+    // evitar abrir 10 veces
+    if (openHandledRef.current === openDesafioId) return;
+
+    // buscamos en lo que ya cargamos
+    const found = items.find((x) => x.id === openDesafioId);
+
+    if (found) {
+      openHandledRef.current = openDesafioId;
+      setDesafioDetalle(found);
+      clearOpenDesafio?.();
+      return;
+    }
+
+    // si todavía no está en items, esperamos a que cargue.
+    // (si ya cargó y no existe, avisamos)
+    if (!loading) {
+      openHandledRef.current = openDesafioId;
+      alert("Ese desafío no está en 'Mis próximos'. Puede ser de otra pareja o ya no es visible.");
+      clearOpenDesafio?.();
+    }
+  }, [openDesafioId, items, loading, clearOpenDesafio]);
 
   // Opciones para los selects de "Nuevo desafío"
   const opcionesParejas = useMemo(
@@ -238,6 +273,10 @@ const DesafiosView: React.FC<{
     setDesafioSeleccionado(copia);
   };
 
+  const cerrarDetalle = () => {
+    setDesafioDetalle(null);
+  };
+
   // ---------- Datos auxiliares del modal (llave + puesto en juego) ----------
   const parejaRetadoraSeleccionada = parejas.find(
     (p) => String(p.id) === formCrear.retadora_pareja_id
@@ -287,20 +326,9 @@ const DesafiosView: React.FC<{
               type="button"
               onClick={async () => {
                 try {
-                  const jwt = localStorage.getItem("token");
-                  if (!jwt) {
-                    alert("No hay sesión activa (token). Volvé a loguearte.");
-                    return;
-                  }
-
-                  const fcmToken = await activarNotificaciones();
-
-                  // ✅ CAMBIO: registrar token en backend (Neon)
-                  await registerPushToken(jwt, fcmToken);
-
-                  // debug opcional
-                  localStorage.setItem("last_fcm_token", fcmToken);
-
+                  // ✅ esto ya pide permiso, registra SW, obtiene FCM, y lo guarda en Neon
+                  const token = await activarNotificacionesYGuardar();
+                  localStorage.setItem("last_fcm_token", token);
                   alert("✅ Notificaciones activadas y token registrado.");
                 } catch (e: any) {
                   console.error(e);
@@ -443,6 +471,14 @@ const DesafiosView: React.FC<{
                             Partido jugado
                           </span>
                         )}
+
+                        {/* ✅ botón detalle (útil también sin push) */}
+                        <button
+                          onClick={() => setDesafioDetalle(d)}
+                          className="rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                        >
+                          Ver detalle
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -451,6 +487,99 @@ const DesafiosView: React.FC<{
           </div>
         </section>
       </div>
+
+      {/* ✅ Modal DETALLE (tipo AppSheet) */}
+      {desafioDetalle && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <h3 className="text-base font-semibold">
+                  {construirTituloDesafio(desafioDetalle)}
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  {formatFecha(desafioDetalle.fecha)} · {desafioDetalle.hora.slice(0, 5)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={cerrarDetalle}
+                className="text-xs text-slate-500 hover:text-slate-700"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between mb-3">
+              <BadgeEstado estado={desafioDetalle.estado} />
+              <span className="text-[11px] text-slate-400">ID: {desafioDetalle.id}</span>
+            </div>
+
+            {desafioDetalle.observacion && (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-700 mb-4">
+                {desafioDetalle.observacion}
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-2 justify-end">
+              {desafioDetalle.estado === "Pendiente" && (
+                <>
+                  <button
+                    onClick={async () => {
+                      await handleAceptar(desafioDetalle.id);
+                      cerrarDetalle();
+                    }}
+                    className="rounded-full bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700"
+                  >
+                    Aceptar
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await handleRechazar(desafioDetalle.id);
+                      cerrarDetalle();
+                    }}
+                    className="rounded-full border border-orange-300 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-50"
+                  >
+                    Rechazar
+                  </button>
+                </>
+              )}
+
+              {desafioDetalle.estado === "Aceptado" && (
+                <>
+                  <button
+                    onClick={() => {
+                      abrirModalResultado(desafioDetalle);
+                      cerrarDetalle();
+                    }}
+                    className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
+                  >
+                    Cargar resultado
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await handleRechazar(desafioDetalle.id);
+                      cerrarDetalle();
+                    }}
+                    className="rounded-full border border-orange-300 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-50"
+                  >
+                    Rechazar
+                  </button>
+                </>
+              )}
+
+              {(desafioDetalle.estado === "Jugado" || desafioDetalle.estado === "Rechazado") && (
+                <button
+                  onClick={cerrarDetalle}
+                  className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                >
+                  OK
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal NUEVO DESAFÍO */}
       {showCrear && (
@@ -603,7 +732,28 @@ const App: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<TabId>("desafiosMasculinos");
 
-  // ✅ AGREGADO: títulos dinámicos por tab
+  // ✅ Para abrir un desafío cuando viene desde notificación: /?open_desafio=123
+  const [openDesafioId, setOpenDesafioId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const v = sp.get("open_desafio");
+    if (!v) return;
+
+    const n = Number(v);
+    if (!Number.isFinite(n) || n <= 0) return;
+
+    // mandamos a desafíos
+    setActiveTab("desafiosMasculinos");
+    setOpenDesafioId(n);
+
+    // limpiamos la URL para que no se repita
+    sp.delete("open_desafio");
+    const newUrl = `${window.location.pathname}${sp.toString() ? `?${sp.toString()}` : ""}${window.location.hash || ""}`;
+    window.history.replaceState({}, "", newUrl);
+  }, []);
+
+  // títulos dinámicos por tab
   const headerByTab: Record<TabId, { title: string; subtitle: string }> = {
     desafiosMasculinos: {
       title: "🏆 Ranking Pádel Oficial",
@@ -623,7 +773,6 @@ const App: React.FC = () => {
     },
   };
 
-  // ✅ AGREGADO: header seleccionado según tab activo
   const header = headerByTab[activeTab];
 
   const handleLoggedIn = () => {
@@ -654,6 +803,8 @@ const App: React.FC = () => {
             onLogout={handleLogout}
             headerTitle={header.title}
             headerSubtitle={header.subtitle}
+            openDesafioId={openDesafioId}
+            clearOpenDesafio={() => setOpenDesafioId(null)}
           />
         )}
 
