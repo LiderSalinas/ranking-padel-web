@@ -1,5 +1,10 @@
 // src/push.ts
-import { getMessaging, getToken, onMessage, type MessagePayload } from "firebase/messaging";
+import {
+  getMessaging,
+  getToken,
+  onMessage,
+  type MessagePayload,
+} from "firebase/messaging";
 import { app } from "./firebase";
 
 const API_URL = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
@@ -7,11 +12,50 @@ const VAPID_KEY = import.meta.env.VITE_VAPID_KEY as string;
 
 let foregroundListenerReady = false;
 
-export async function activarNotificaciones(): Promise<string> {
+// ✅ Anti-duplicado de notis en foreground (TTL corto)
+const fgDedup = new Map<string, number>();
+const FG_DEDUP_TTL_MS = 6_000;
+
+function dedupKeyFromPayload(payload: MessagePayload): string {
+  const title =
+    payload.notification?.title || (payload.data?.title as string) || "";
+  const body =
+    payload.notification?.body || (payload.data?.body as string) || "";
+  const desafioId = (payload.data?.desafio_id as string) || "";
+  return `${desafioId}::${title}::${body}`.trim();
+}
+
+function shouldShowForegroundNotification(payload: MessagePayload): boolean {
+  const key = dedupKeyFromPayload(payload);
+  const now = Date.now();
+
+  // limpia viejos
+  for (const [k, t] of fgDedup.entries()) {
+    if (now - t > FG_DEDUP_TTL_MS) fgDedup.delete(k);
+  }
+
+  const last = fgDedup.get(key);
+  if (last && now - last < FG_DEDUP_TTL_MS) return false;
+
+  fgDedup.set(key, now);
+  return true;
+}
+
+async function getOrRegisterServiceWorker(): Promise<ServiceWorkerRegistration> {
   if (!("serviceWorker" in navigator)) {
     throw new Error("Este navegador no soporta Service Workers");
   }
 
+  // Si ya hay SW registrado, reutilizamos
+  const existing = await navigator.serviceWorker.getRegistration();
+  if (existing) return existing;
+
+  // Si no hay, registramos el de FCM
+  const reg = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+  return reg;
+}
+
+export async function activarNotificaciones(): Promise<string> {
   if (!VAPID_KEY) {
     throw new Error("Falta VITE_VAPID_KEY en .env.local / Vercel");
   }
@@ -21,15 +65,28 @@ export async function activarNotificaciones(): Promise<string> {
     throw new Error("Permiso de notificaciones denegado");
   }
 
-  // ✅ el SW TIENE que existir en /public/firebase-messaging-sw.js
-  const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+  // ✅ SW (reutiliza si ya existe)
+  const registration = await getOrRegisterServiceWorker();
+
+  // ✅ importante: esperar a que el SW esté listo
+  try {
+    await navigator.serviceWorker.ready;
+  } catch {
+    // no es fatal, pero ayuda a estabilizar
+  }
 
   const messaging = getMessaging(app);
 
-  const token = await getToken(messaging, {
-    vapidKey: VAPID_KEY,
-    serviceWorkerRegistration: registration,
-  });
+  let token = "";
+  try {
+    token = await getToken(messaging, {
+      vapidKey: VAPID_KEY,
+      serviceWorkerRegistration: registration,
+    });
+  } catch (e) {
+    console.error("❌ getToken error:", e);
+    throw new Error("No se pudo obtener el FCM token (getToken falló).");
+  }
 
   if (!token) {
     throw new Error("No se pudo obtener el FCM token");
@@ -72,10 +129,10 @@ export async function activarNotificacionesYGuardar(): Promise<string> {
 }
 
 /**
- * ✅ Listener de notificaciones en FOREGROUND (cuando la web está abierta).
- * - No duplica listeners (idempotente).
- * - Si llega payload con notification => intenta mostrar una Notification nativa.
- * - Si no hay permission => hace console.warn y sale.
+ * ✅ Listener FOREGROUND (cuando la web está abierta).
+ * - Idempotente (no duplica listeners)
+ * - Dedupe anti-doble noti
+ * - Abre /?open_desafio=ID (relativo) para que funcione en local y Vercel
  */
 export function listenForegroundPush() {
   if (foregroundListenerReady) return;
@@ -92,6 +149,12 @@ export function listenForegroundPush() {
         return;
       }
 
+      // ✅ evita dobles notis
+      if (!shouldShowForegroundNotification(payload)) {
+        console.log("🧯 Foreground push deduplicado");
+        return;
+      }
+
       const title =
         payload.notification?.title ||
         (payload.data?.title as string) ||
@@ -102,14 +165,14 @@ export function listenForegroundPush() {
         (payload.data?.body as string) ||
         "Tenés una nueva notificación";
 
-      // soporte: si viene desafio_id en data, abrimos detalle
       const desafioId = payload.data?.desafio_id as string | undefined;
+
+      // ✅ URL relativa (mejor que origin fijo)
       const url =
         desafioId && String(desafioId).trim() !== ""
-          ? `${window.location.origin}/?open_desafio=${encodeURIComponent(desafioId)}`
-          : window.location.origin;
+          ? `/?open_desafio=${encodeURIComponent(desafioId)}`
+          : `/`;
 
-      // Mostramos notificación nativa en foreground (similar a SW)
       const notif = new Notification(title, {
         body,
         data: { url },
@@ -118,9 +181,8 @@ export function listenForegroundPush() {
       notif.onclick = () => {
         try {
           window.focus();
-          window.location.href = url;
+          window.location.assign(url);
         } catch {
-          // fallback
           window.open(url, "_blank");
         }
       };
