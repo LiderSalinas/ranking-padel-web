@@ -15,6 +15,11 @@ export async function getMisProximosDesafios(): Promise<Desafio[]> {
   return request<Desafio[]>("/desafios/mis-proximos");
 }
 
+// ✅ NUEVO: obtener desafío por ID (para abrir desde push)
+export async function getDesafioById(id: number): Promise<Desafio> {
+  return request<Desafio>(`/desafios/${id}`);
+}
+
 // --------- crear desafío ---------
 export async function crearDesafio(
   payload: CrearDesafioPayload,
@@ -39,8 +44,6 @@ export async function rechazarDesafio(id: number): Promise<Desafio> {
 }
 
 // --------- Cargar resultado de un desafío ---------
-
-// Este tipo está alineado con tu Pydantic ResultadoSets
 export type CargarResultadoPayload = {
   desafio_id: number;
 
@@ -57,8 +60,6 @@ export async function cargarResultadoDesafio(
 ): Promise<Desafio> {
   const { desafio_id, ...body } = payload;
 
-  // Coincide EXACTO con tu backend:
-  // @router.post("/{desafio_id}/resultado")
   return request<Desafio>(`/desafios/${desafio_id}/resultado`, {
     method: "POST",
     body: JSON.stringify(body),

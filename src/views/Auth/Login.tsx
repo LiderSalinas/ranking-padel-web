@@ -1,19 +1,36 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { login } from "../../services/auth";
-import { activarNotificaciones, registerPushToken } from "../../push";
+import { activarNotificacionesYGuardar, tryAutoRegisterPush } from "../../push";
 
 type LoginProps = {
   onLoggedIn: () => void;
 };
 
+function detectProvider(email: string): string {
+  const e = email.toLowerCase().trim();
+  const domain = e.split("@")[1] || "";
+  if (domain.includes("gmail")) return "Google";
+  if (domain.includes("outlook") || domain.includes("hotmail") || domain.includes("live")) return "Microsoft";
+  if (domain.includes("icloud")) return "Apple";
+  if (domain.includes("yahoo")) return "Yahoo";
+  return domain ? domain : "tu proveedor";
+}
+
 const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
   const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
+  const provider = useMemo(() => detectProvider(email), [email]);
 
+  const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string>("");
   const [error, setError] = useState<string>("");
 
-  const [fcmToken, setFcmToken] = useState<string>("");
+  const [showEnablePush, setShowEnablePush] = useState(false);
+
+  useEffect(() => {
+    // si ya habías activado antes, no mostrar CTA al pedo
+    const once = localStorage.getItem("push_registered_once") === "1";
+    if (once) setShowEnablePush(false);
+  }, []);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -23,11 +40,21 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
 
     try {
       const resp = await login(email.trim());
-      // tu login() ya guarda el JWT en localStorage ("token")
+      setMsg(resp?.login_url ? "📩 Link enviado (si aplica)" : "✅ Login OK");
 
-      setMsg(resp?.login_url ? "📩 Link enviado al email (si aplica)" : "✅ Login OK");
+      // ✅ Intentar auto-registro si ya está granted (sin pedir permiso)
+      const auto = await tryAutoRegisterPush();
+      if (auto.ok) {
+        setMsg("✅ Login OK · Notificaciones listas");
+        setShowEnablePush(false);
+      } else {
+        // si necesita permiso, mostramos CTA (solo acá)
+        if (auto.reason === "need_permission") {
+          const once = localStorage.getItem("push_registered_once") === "1";
+          setShowEnablePush(!once);
+        }
+      }
 
-      // si tu backend devuelve token directo, ya podés entrar
       onLoggedIn();
     } catch (err: any) {
       setError(err?.message || "Error logueando");
@@ -36,79 +63,84 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
     }
   }
 
-  async function handleActivarNotificaciones() {
+  async function handleEnablePush() {
     setError("");
     setMsg("");
-
     try {
-      const jwt = localStorage.getItem("token") || "";
-      if (!jwt) throw new Error("No hay JWT en localStorage. Logueate primero.");
-
-      const token = await activarNotificaciones();
-      setFcmToken(token);
-
-      // 🔥 ACÁ está lo importante: registrar el token en tu backend
-      const r = await registerPushToken(jwt, token);
-
-      setMsg(`✅ Notificaciones activadas y token registrado (jugador_id=${r?.jugador_id ?? "?"})`);
+      await activarNotificacionesYGuardar();
+      setMsg("✅ Notificaciones activadas");
+      setShowEnablePush(false);
     } catch (err: any) {
       setError(err?.message || "Error activando notificaciones");
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow p-5">
-        <h1 className="text-xl font-bold">Login</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Ingresá tu email para obtener acceso.
-        </p>
-
-        <form onSubmit={handleLogin} className="mt-4 space-y-3">
-          <input
-            className="w-full border rounded-xl p-3 outline-none"
-            placeholder="tu@email.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            type="email"
-            required
-          />
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-xl p-3 font-semibold bg-black text-white disabled:opacity-60"
-          >
-            {loading ? "Ingresando..." : "Ingresar"}
-          </button>
-        </form>
-
-        <div className="mt-4 flex gap-2">
-          <button
-            onClick={handleActivarNotificaciones}
-            className="flex-1 rounded-xl p-3 font-semibold border"
-          >
-            🔔 Activar notificaciones
-          </button>
+    <div className="w-full">
+      <div className="rounded-2xl overflow-hidden shadow bg-white">
+        {/* Header */}
+        <div className="px-6 py-6 bg-gradient-to-br from-slate-900 to-slate-800 text-white">
+          <div className="text-sm opacity-90">🏆 Ranking Pádel Oficial</div>
+          <h1 className="text-2xl font-bold mt-1">Ingresar</h1>
+          <p className="text-xs opacity-80 mt-2 leading-snug">
+            Sin contraseña. Usá tu email, estilo AppSheet.
+          </p>
         </div>
 
-        {msg && (
-          <p className="mt-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl p-3">
-            {msg}
-          </p>
-        )}
+        {/* Body */}
+        <div className="px-6 py-6 space-y-4">
+          <form onSubmit={handleLogin} className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                Email
+              </label>
+              <input
+                className="w-full border border-slate-200 rounded-xl px-3 py-3 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+                placeholder="tu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                type="email"
+                required
+              />
+              <p className="text-[11px] text-slate-500 mt-1">
+                Vas a ingresar con: <span className="font-semibold">{provider}</span>
+              </p>
+            </div>
 
-        {error && (
-          <p className="mt-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl p-3">
-            {error}
-          </p>
-        )}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-xl py-3 font-semibold bg-slate-900 text-white hover:bg-slate-950 disabled:opacity-60"
+            >
+              {loading ? "Ingresando..." : "Ingresar"}
+            </button>
+          </form>
 
-        {fcmToken && (
-          <p className="mt-3 text-[10px] text-slate-500 text-center break-all">
-            ✅ FCM listo: {fcmToken.slice(0, 30)}...
+          {showEnablePush && (
+            <button
+              onClick={handleEnablePush}
+              className="w-full rounded-xl py-3 font-semibold border border-slate-200 hover:bg-slate-50"
+            >
+              🔔 Activar notificaciones (una sola vez)
+            </button>
+          )}
+
+          {msg && (
+            <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+              {msg}
+            </p>
+          )}
+
+          {error && (
+            <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl p-3">
+              {error}
+            </p>
+          )}
+
+          <p className="text-[11px] text-slate-400 text-center">
+            Tip: en Android, instalá la PWA para pushes más “nativos”.
           </p>
-        )}
+        </div>
       </div>
     </div>
   );

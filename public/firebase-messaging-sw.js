@@ -22,9 +22,7 @@ messaging.onBackgroundMessage((payload) => {
   console.log("[SW] onBackgroundMessage:", payload);
 
   const title =
-    payload?.notification?.title ||
-    payload?.data?.title ||
-    "Ranking Pádel";
+    payload?.notification?.title || payload?.data?.title || "Ranking Pádel";
 
   const body =
     payload?.notification?.body ||
@@ -66,6 +64,6 @@ self.addEventListener("notificationclick", (event) => {
       if (clients.openWindow) {
         await clients.openWindow(url);
       }
-    })()
+    })(),
   );
 });
