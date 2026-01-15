@@ -27,9 +27,9 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
   const [showEnablePush, setShowEnablePush] = useState(false);
 
   useEffect(() => {
-    // si ya habías activado antes, no mostrar CTA al pedo
+    // ✅ si nunca se registró, mostramos CTA por defecto
     const once = localStorage.getItem("push_registered_once") === "1";
-    if (once) setShowEnablePush(false);
+    setShowEnablePush(!once);
   }, []);
 
   async function handleLogin(e: React.FormEvent) {
@@ -44,14 +44,25 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
 
       // ✅ Intentar auto-registro si ya está granted (sin pedir permiso)
       const auto = await tryAutoRegisterPush();
+
       if (auto.ok) {
         setMsg("✅ Login OK · Notificaciones listas");
         setShowEnablePush(false);
       } else {
-        // si necesita permiso, mostramos CTA (solo acá)
+        // si necesita permiso → mostramos CTA
         if (auto.reason === "need_permission") {
-          const once = localStorage.getItem("push_registered_once") === "1";
-          setShowEnablePush(!once);
+          setShowEnablePush(true);
+        }
+
+        // si no soporta (WhatsApp iPhone / in-app) → mostramos CTA para que al tocar le explique
+        if (auto.reason === "unsupported") {
+          setShowEnablePush(true);
+          if (auto.message) setMsg(`ℹ️ ${auto.message}`);
+        }
+
+        // si ya estaba registrado, no mostrar CTA
+        if (auto.reason === "already_registered") {
+          setShowEnablePush(false);
         }
       }
 
@@ -66,12 +77,15 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
   async function handleEnablePush() {
     setError("");
     setMsg("");
+
     try {
       await activarNotificacionesYGuardar();
       setMsg("✅ Notificaciones activadas");
       setShowEnablePush(false);
     } catch (err: any) {
+      // acá van a caer los mensajes claros tipo “abrí en Safari…”
       setError(err?.message || "Error activando notificaciones");
+      setShowEnablePush(true);
     }
   }
 
@@ -138,7 +152,7 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
           )}
 
           <p className="text-[11px] text-slate-400 text-center">
-            Tip: en Android, instalá la PWA para pushes más “nativos”.
+            Tip: iPhone → abrí en Safari e instalá (Agregar a pantalla de inicio). Android → Chrome/PWA.
           </p>
         </div>
       </div>

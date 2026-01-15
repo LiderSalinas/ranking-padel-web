@@ -18,7 +18,7 @@ import CargarResultado from "./CargarResultado";
 import RankingView from "./views/Ranking";
 import JugadoresView from "./views/Jugadores";
 
-import { listenForegroundPush, tryAutoRegisterPush } from "./push";
+import { activarNotificacionesYGuardar, listenForegroundPush, tryAutoRegisterPush } from "./push";
 
 // Helper chiquito para mostrar 1/12, etc.
 function formatFecha(iso: string): string {
@@ -288,16 +288,56 @@ const DesafiosView: React.FC<{
           </div>
 
           <div className="flex items-center gap-3">
-            {/* ✅ ya no dependés de este botón, pero lo podés dejar como “reparar” */}
+            {/* ✅ Botón notificaciones: ahora ACTIVA acá mismo si hace falta */}
             <button
               type="button"
               onClick={async () => {
-                const r = await tryAutoRegisterPush();
-                if (r.ok) alert("✅ Notificaciones ya estaban listas.");
-                else alert("ℹ️ Si querés activar, hacelo desde el login.");
+                try {
+                  const r = await tryAutoRegisterPush();
+
+                  // ✅ Ya listo / ya registrado
+                  if (r.ok || r.reason === "already_registered") {
+                    alert("✅ Notificaciones ya estaban listas.");
+                    return;
+                  }
+
+                  // ❌ No soporta (iPhone en WhatsApp/IG / navegador raro)
+                  if (r.reason === "unsupported") {
+                    alert(r.message || "Este navegador no soporta notificaciones. Abrí en Safari/Chrome.");
+                    return;
+                  }
+
+                  // ❌ Denegado: el usuario bloqueó notificaciones
+                  if (r.reason === "denied") {
+                    alert(
+                      "⚠️ Tenés bloqueadas las notificaciones.\n\n" +
+                        "iPhone: Ajustes > Notificaciones > (Safari/PWA)\n" +
+                        "Android: Configuración del sitio > Notificaciones"
+                    );
+                    return;
+                  }
+
+                  // ✅ Necesita permiso => activamos acá mismo
+                  if (r.reason === "need_permission") {
+                    await activarNotificacionesYGuardar();
+                    alert("✅ Notificaciones activadas");
+                    return;
+                  }
+
+                  // No session (raro porque estás logueado, pero por las dudas)
+                  if (r.reason === "no_session") {
+                    alert("⚠️ No hay sesión activa. Volvé a loguearte.");
+                    return;
+                  }
+
+                  // fallback
+                  alert(r.message || "No se pudo activar/verificar notificaciones.");
+                } catch (e: any) {
+                  alert(e?.message || "Error verificando/activando notificaciones");
+                }
               }}
               className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-indigo-600 text-white shadow-md hover:bg-indigo-700 active:scale-[0.96] transition"
-              title="Estado notificaciones"
+              title="Notificaciones"
             >
               <span className="text-xl">🔔</span>
             </button>

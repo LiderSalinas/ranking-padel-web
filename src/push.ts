@@ -33,8 +33,47 @@ function shouldShowForegroundNotification(payload: MessagePayload): boolean {
   return true;
 }
 
+// ------------------ helpers de compatibilidad ------------------
+
+function isNotificationSupported(): boolean {
+  return typeof window !== "undefined" && "Notification" in window;
+}
+
+function isServiceWorkerSupported(): boolean {
+  return typeof navigator !== "undefined" && "serviceWorker" in navigator;
+}
+
+function isSecureContextOk(): boolean {
+  // en Vercel es https; localhost también está ok
+  return typeof window !== "undefined" && (window.isSecureContext || window.location.hostname === "localhost");
+}
+
+function isIOS(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  return /iPhone|iPad|iPod/i.test(ua);
+}
+
+function isInAppBrowser(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  // WhatsApp / Instagram / Facebook in-app
+  return /FBAN|FBAV|Instagram|Line|WhatsApp/i.test(ua);
+}
+
+function unsupportedMessage(): string {
+  // mensaje “humano” y directo
+  if (isIOS()) {
+    if (isInAppBrowser()) {
+      return "En iPhone, las notificaciones NO funcionan dentro de WhatsApp/Instagram. Abrí el link en Safari.";
+    }
+    return "En iPhone, activá notificaciones desde Safari y mejor si instalás la app (Agregar a pantalla de inicio).";
+  }
+  return "Este navegador no soporta notificaciones push. Probá en Chrome (ideal: instalá la PWA).";
+}
+
 async function getOrRegisterServiceWorker(): Promise<ServiceWorkerRegistration> {
-  if (!("serviceWorker" in navigator)) {
+  if (!isServiceWorkerSupported()) {
     throw new Error("Este navegador no soporta Service Workers");
   }
 
@@ -45,9 +84,25 @@ async function getOrRegisterServiceWorker(): Promise<ServiceWorkerRegistration> 
   return reg;
 }
 
+// ------------------ API principal ------------------
+
 export async function activarNotificaciones(): Promise<string> {
   if (!VAPID_KEY) throw new Error("Falta VITE_VAPID_KEY en .env.local / Vercel");
+  if (!API_URL) throw new Error("Falta VITE_API_URL");
 
+  if (!isSecureContextOk()) {
+    throw new Error("La web debe estar en HTTPS para notificaciones.");
+  }
+
+  if (!isNotificationSupported()) {
+    throw new Error(unsupportedMessage());
+  }
+
+  if (!isServiceWorkerSupported()) {
+    throw new Error("Este navegador no soporta Service Workers (necesarios para push).");
+  }
+
+  // ✅ Pedir permiso seguro
   const permission = await Notification.requestPermission();
   if (permission !== "granted") throw new Error("Permiso de notificaciones denegado");
 
@@ -93,7 +148,6 @@ export async function registerPushToken(jwt: string, fcmToken: string) {
   return res.json();
 }
 
-// ✅ Botón manual (por si querés mantenerlo)
 export async function activarNotificacionesYGuardar(): Promise<string> {
   const jwt = localStorage.getItem("token");
   if (!jwt) throw new Error("No hay sesión activa (token). Volvé a loguearte.");
@@ -109,21 +163,33 @@ export async function activarNotificacionesYGuardar(): Promise<string> {
 // ✅ NUEVO: auto-registro SOLO si ya está concedido (sin pedir permiso)
 export async function tryAutoRegisterPush(): Promise<
   | { ok: true; token: string }
-  | { ok: false; reason: "no_session" | "need_permission" | "denied" | "already_registered" | "error"; message?: string }
+  | {
+      ok: false;
+      reason: "no_session" | "need_permission" | "denied" | "already_registered" | "unsupported" | "error";
+      message?: string;
+    }
 > {
   const jwt = localStorage.getItem("token");
   if (!jwt) return { ok: false, reason: "no_session" };
+
+  // ✅ Si no soporta Notification, no crashear
+  if (!isNotificationSupported()) {
+    return { ok: false, reason: "unsupported", message: unsupportedMessage() };
+  }
 
   const perm = Notification.permission;
   if (perm === "denied") return { ok: false, reason: "denied" };
   if (perm !== "granted") return { ok: false, reason: "need_permission" };
 
+  // ✅ Si no hay SW, tampoco sirve
+  if (!isServiceWorkerSupported()) {
+    return { ok: false, reason: "unsupported", message: "Este navegador no soporta Service Workers." };
+  }
+
   try {
-    // Si ya registramos una vez y no cambió token, no spamear backend
     const lastToken = localStorage.getItem("last_fcm_token") || "";
     const alreadyOnce = localStorage.getItem("push_registered_once") === "1";
 
-    // Obtener token actual (sin prompt)
     if (!VAPID_KEY) return { ok: false, reason: "error", message: "Falta VITE_VAPID_KEY" };
 
     const registration = await getOrRegisterServiceWorker();
@@ -137,7 +203,6 @@ export async function tryAutoRegisterPush(): Promise<
 
     if (!currentToken) return { ok: false, reason: "error", message: "No se pudo obtener token actual" };
 
-    // Si no cambió y ya lo hicimos, listo
     if (alreadyOnce && lastToken && lastToken === currentToken) {
       return { ok: false, reason: "already_registered" };
     }
@@ -166,6 +231,8 @@ export function listenForegroundPush() {
 
   (async () => {
     try {
+      if (!isServiceWorkerSupported()) return;
+
       await getOrRegisterServiceWorker();
       try { await navigator.serviceWorker.ready; } catch {}
 
@@ -173,6 +240,9 @@ export function listenForegroundPush() {
 
       onMessage(messaging, async (payload: MessagePayload) => {
         console.log("📩 PUSH FOREGROUND payload:", payload);
+
+        // ✅ no tocar Notification si no existe
+        if (!isNotificationSupported()) return;
 
         if (Notification.permission !== "granted") return;
 
