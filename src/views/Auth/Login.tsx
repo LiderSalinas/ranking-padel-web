@@ -97,7 +97,7 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
           <div className="text-sm opacity-90">🏆 Ranking Pádel Oficial</div>
           <h1 className="text-2xl font-bold mt-1">Ingresar</h1>
           <p className="text-xs opacity-80 mt-2 leading-snug">
-            Sin contraseña. Usá tu email, estilo AppSheet.
+            Sin contraseña. Usá tu email.
           </p>
         </div>
 
