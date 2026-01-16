@@ -1,6 +1,7 @@
 // src/App.tsx
 import React, { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 
+
 import type { Desafio } from "./types/desafios";
 import type { ParejaDesafiable } from "./types/parejas";
 
@@ -18,7 +19,14 @@ import CargarResultado from "./CargarResultado";
 import RankingView from "./views/Ranking";
 import JugadoresView from "./views/Jugadores";
 
-import { activarNotificacionesYGuardar, listenForegroundPush, tryAutoRegisterPush } from "./push";
+import {
+  activarNotificacionesYGuardar,
+  listenForegroundPush,
+  tryAutoRegisterPush,
+  setOnForegroundToast, // ✅ NUEVO
+} from "./push";
+
+import ForegroundToast from "./components/ForegroundToast"; // ✅ NUEVO
 
 // Helper chiquito para mostrar 1/12, etc.
 function formatFecha(iso: string): string {
@@ -706,6 +714,14 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>("desafiosMasculinos");
   const [openDesafioId, setOpenDesafioId] = useState<number | null>(null);
 
+  // ✅ NUEVO: estado del toast para foreground
+  const [fgToast, setFgToast] = useState<{ open: boolean; title: string; body: string; url: string }>({
+    open: false,
+    title: "",
+    body: "",
+    url: "/",
+  });
+
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
     const v = sp.get("open_desafio");
@@ -724,6 +740,15 @@ const App: React.FC = () => {
 
   useEffect(() => {
     listenForegroundPush();
+  }, []);
+
+  // ✅ NUEVO: conectamos el callback del push.ts para que muestre toast adentro
+  useEffect(() => {
+    setOnForegroundToast((info) => {
+      setFgToast({ open: true, ...info });
+    });
+
+    return () => setOnForegroundToast(null);
   }, []);
 
   useEffect(() => {
@@ -772,6 +797,25 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-100">
+      {/* ✅ NUEVO: toast foreground */}
+      <ForegroundToast
+        open={fgToast.open}
+        title={fgToast.title}
+        body={fgToast.body}
+        onClose={() => setFgToast((t) => ({ ...t, open: false }))}
+        onClick={() => {
+          // al click, abrimos el link (por ejemplo ?open_desafio=...)
+          try {
+            window.focus();
+            window.location.assign(fgToast.url || "/");
+          } catch {
+            window.open(fgToast.url || "/", "_blank");
+          } finally {
+            setFgToast((t) => ({ ...t, open: false }));
+          }
+        }}
+      />
+
       <main className="flex-1 pb-16">
         {activeTab === "desafiosMasculinos" && (
           <DesafiosView

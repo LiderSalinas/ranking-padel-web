@@ -84,6 +84,40 @@ async function getOrRegisterServiceWorker(): Promise<ServiceWorkerRegistration> 
   return reg;
 }
 
+// ------------------ ✅ NUEVO: BRIDGE PARA TOAST EN FOREGROUND ------------------
+// (No cambia tu lógica, solo “emite” info para que App muestre banner SI O SI)
+
+let onForegroundToast: ((info: { title: string; body: string; url: string }) => void) | null = null;
+
+export function setOnForegroundToast(
+  fn: ((info: { title: string; body: string; url: string }) => void) | null
+) {
+  onForegroundToast = fn;
+}
+
+function emitForegroundToast(payload: MessagePayload) {
+  if (!onForegroundToast) return;
+
+  const title =
+    payload.notification?.title ||
+    (payload.data?.title as string) ||
+    "Ranking Pádel";
+
+  const body =
+    payload.notification?.body ||
+    (payload.data?.body as string) ||
+    "Tenés una nueva notificación";
+
+  const desafioId = payload.data?.desafio_id as string | undefined;
+
+  const url =
+    desafioId && String(desafioId).trim() !== ""
+      ? `/?open_desafio=${encodeURIComponent(desafioId)}`
+      : `/`;
+
+  onForegroundToast({ title, body, url });
+}
+
 // ------------------ API principal ------------------
 
 export async function activarNotificaciones(): Promise<string> {
@@ -224,6 +258,7 @@ export async function tryAutoRegisterPush(): Promise<
  * - Idempotente
  * - Dedupe
  * - En móvil/PWA: usa SW.showNotification (más confiable)
+ * - ✅ NUEVO: emite Toast interno para que SE VEA SI O SI
  */
 export function listenForegroundPush() {
   if (foregroundListenerReady) return;
@@ -250,6 +285,9 @@ export function listenForegroundPush() {
           console.log("🧯 Foreground push deduplicado");
           return;
         }
+
+        // ✅ NUEVO: toast dentro de la app (confiable 100%)
+        emitForegroundToast(payload);
 
         const title =
           payload.notification?.title ||
