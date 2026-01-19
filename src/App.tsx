@@ -540,8 +540,22 @@ const DesafiosView: React.FC<{
                           <span className="text-[11px] text-emerald-700">Partido jugado</span>
                         )}
 
+                        {/* ✅ CAMBIO ÚNICO: ahora dispara GET /desafios/{id} para traer detalle completo */}
                         <button
-                          onClick={() => setDesafioDetalle(d)}
+                          onClick={async () => {
+                            // 1) Abrimos rápido con lo que ya tenemos
+                            setDesafioDetalle(d);
+
+                            // 2) Si está Jugado, intentamos traer detalle completo (sets)
+                            if (d.estado === "Jugado") {
+                              try {
+                                const full = await getDesafioById(d.id);
+                                setDesafioDetalle(full);
+                              } catch (e) {
+                                console.warn("No se pudo traer detalle completo del desafío", e);
+                              }
+                            }
+                          }}
                           className="rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
                         >
                           Ver detalle
@@ -735,7 +749,9 @@ const DesafiosView: React.FC<{
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Ganador (pareja):</span>
                   <span className="font-semibold">
-                    {desafioDetalle.ganador_pareja_id ? labelPareja(desafioDetalle.ganador_pareja_id) : "—"}
+                    {desafioDetalle.ganador_pareja_id
+                      ? labelPareja(desafioDetalle.ganador_pareja_id)
+                      : "—"}
                   </span>
                 </div>
 
@@ -976,9 +992,7 @@ const App: React.FC = () => {
     setOpenDesafioId(n);
 
     sp.delete("open_desafio");
-    const newUrl = `${window.location.pathname}${
-      sp.toString() ? `?${sp.toString()}` : ""
-    }${window.location.hash || ""}`;
+    const newUrl = `${window.location.pathname}${sp.toString() ? `?${sp.toString()}` : ""}${window.location.hash || ""}`;
     window.history.replaceState({}, "", newUrl);
   }, []);
 
