@@ -546,14 +546,12 @@ const DesafiosView: React.FC<{
                             // 1) Abrimos rápido con lo que ya tenemos
                             setDesafioDetalle(d);
 
-                            // 2) Si está Jugado, intentamos traer detalle completo (sets)
-                            if (d.estado === "Jugado") {
-                              try {
-                                const full = await getDesafioById(d.id);
-                                setDesafioDetalle(full);
-                              } catch (e) {
-                                console.warn("No se pudo traer detalle completo del desafío", e);
-                              }
+                            // 2) Traemos detalle completo (sets, fecha_jugado, etc.)
+                            try {
+                              const full = await getDesafioById(d.id);
+                              setDesafioDetalle(full);
+                            } catch (e) {
+                              console.warn("No se pudo traer detalle completo del desafío", e);
                             }
                           }}
                           className="rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"

@@ -27,11 +27,11 @@ export interface Desafio {
   // ✅ Campos opcionales para el detalle ideal (NO rompen si el backend no los manda)
   fecha_jugado?: string | null;
 
-  set1_retador?: number;
-  set1_desafiado?: number;
+  set1_retador?: number | null;
+  set1_desafiado?: number | null;
 
-  set2_retador?: number;
-  set2_desafiado?: number;
+  set2_retador?: number | null;
+  set2_desafiado?: number | null;
 
   // tercer set / super tie-break (puede venir null)
   set3_retador?: number | null;
