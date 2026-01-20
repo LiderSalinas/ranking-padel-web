@@ -161,7 +161,7 @@ const DesafiosView: React.FC<{
         const d = await getDesafioById(openDesafioId);
 
         // opcional: lo “inyectamos” arriba en items para que quede visible
-               setItems((prev) => {
+        setItems((prev) => {
           const exists = prev.some((x) => x.id === d.id);
           return exists ? prev : [d, ...prev];
         });
@@ -207,31 +207,6 @@ const DesafiosView: React.FC<{
   const labelPareja = (id: number | null | undefined): string => {
     if (!id) return "—";
     return mapaParejas.get(id) ?? `Pareja ${id}`;
-  };
-
-  // ✅ NUEVO: obtiene nombres retadora/retada para el detalle (robusto ante "VS" / "vs" / etc.)
-  // Prioriza el mapa (por ids). Si no hay mapa, cae al titulo_desafio.
-  const getTitularRetadoras = (d: Desafio): { retadora: string; retada: string } => {
-    const a = labelPareja(d.retadora_pareja_id);
-    const b = labelPareja(d.retada_pareja_id);
-
-    // si el mapa ya tiene nombres reales, listo
-    if (a !== `Pareja ${d.retadora_pareja_id}` || b !== `Pareja ${d.retada_pareja_id}`) {
-      return { retadora: a, retada: b };
-    }
-
-    // fallback: parsear titulo_desafio
-    const titulo = (d.titulo_desafio || "").trim();
-    if (!titulo) return { retadora: a, retada: b };
-
-    const parts = titulo.split(/ vs /i).map((x) => x.trim()).filter(Boolean);
-    if (parts.length >= 2) return { retadora: parts[0], retada: parts.slice(1).join(" vs ") };
-
-    // otro fallback: "VS"
-    const parts2 = titulo.split(/ VS /i).map((x) => x.trim()).filter(Boolean);
-    if (parts2.length >= 2) return { retadora: parts2[0], retada: parts2.slice(1).join(" VS ") };
-
-    return { retadora: a, retada: b };
   };
 
   const handleCrearChange = (
@@ -309,6 +284,7 @@ const DesafiosView: React.FC<{
     setDesafioSeleccionado(copia);
   };
 
+  const cerrarDetalle = () => setDesafioDetalle(null);
 
   const parejaRetadoraSeleccionada = parejas.find(
     (p) => String(p.id) === formCrear.retadora_pareja_id
@@ -382,7 +358,7 @@ const DesafiosView: React.FC<{
       };
     }
 
-    // si no swap, se mantienen (igual mostramos si querés histórico)
+    // si no swap, se mantienen
     return {
       retadora: { old: oldR, new: oldR },
       retada: { old: oldD, new: oldD },
@@ -401,26 +377,23 @@ const DesafiosView: React.FC<{
           </div>
 
           <div className="flex items-center gap-3">
-            {/* ✅ Botón notificaciones: ahora ACTIVA acá mismo si hace falta */}
+            {/* ✅ Botón notificaciones */}
             <button
               type="button"
               onClick={async () => {
                 try {
                   const r = await tryAutoRegisterPush();
 
-                  // ✅ Ya listo / ya registrado
                   if (r.ok || r.reason === "already_registered") {
                     alert("✅ Notificaciones ya estaban listas.");
                     return;
                   }
 
-                  // ❌ No soporta (iPhone en WhatsApp/IG / navegador raro)
                   if (r.reason === "unsupported") {
                     alert(r.message || "Este navegador no soporta notificaciones. Abrí en Safari/Chrome.");
                     return;
                   }
 
-                  // ❌ Denegado: el usuario bloqueó notificaciones
                   if (r.reason === "denied") {
                     alert(
                       "⚠️ Tenés bloqueadas las notificaciones.\n\n" +
@@ -430,20 +403,17 @@ const DesafiosView: React.FC<{
                     return;
                   }
 
-                  // ✅ Necesita permiso => activamos acá mismo
                   if (r.reason === "need_permission") {
                     await activarNotificacionesYGuardar();
                     alert("✅ Notificaciones activadas");
                     return;
                   }
 
-                  // No session (raro porque estás logueado, pero por las dudas)
                   if (r.reason === "no_session") {
                     alert("⚠️ No hay sesión activa. Volvé a loguearte.");
                     return;
                   }
 
-                  // fallback
                   alert(r.message || "No se pudo activar/verificar notificaciones.");
                 } catch (e: any) {
                   alert(e?.message || "Error verificando/activando notificaciones");
@@ -564,13 +534,10 @@ const DesafiosView: React.FC<{
                           <span className="text-[11px] text-emerald-700">Partido jugado</span>
                         )}
 
-                        {/* ✅ CAMBIO ÚNICO: ahora dispara GET /desafios/{id} para traer detalle completo */}
+                        {/* ✅ trae detalle completo */}
                         <button
                           onClick={async () => {
-                            // 1) Abrimos rápido con lo que ya tenemos
                             setDesafioDetalle(d);
-
-                            // 2) Traemos detalle completo (sets, fecha_jugado, etc.)
                             try {
                               const full = await getDesafioById(d.id);
                               setDesafioDetalle(full);
@@ -591,282 +558,280 @@ const DesafiosView: React.FC<{
         </section>
       </div>
 
-      {/* ✅ Modal DETALLE (mejorado, sin romper nada) */}
+      {/* ✅ Modal DETALLE (arreglado tamaño + footer fijo + Retador/Desafiado + Sets con nombres) */}
       {desafioDetalle && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-3">
+          <div className="w-full max-w-lg max-h-[92vh] rounded-2xl bg-white shadow-xl flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div>
-                <h3 className="text-lg font-semibold">Detalle del partido</h3>
-
-                {/* subheader tipo “Jugado: …” */}
-                <p className="text-xs text-slate-500 mt-1">
-                  Jugado: {getFechaJugadoLabel(desafioDetalle)}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setDesafioDetalle(null)}
-                className="text-xs text-slate-500 hover:text-slate-700"
-              >
-                Cerrar
-              </button>
-            </div>
-
-            {/* Estado + ID */}
-            <div className="flex items-center justify-between mb-4">
-              <BadgeEstado estado={desafioDetalle.estado} />
-              <span className="text-[11px] text-slate-400">ID: {desafioDetalle.id}</span>
-            </div>
-
-            {/* Equipos + ganador (por DÚOS) */}
-            <div className="space-y-2 mb-4">
-              {desafioDetalle.estado === "Jugado" && desafioDetalle.ganador_pareja_id ? (
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">🏆</span>
-                  <div>
-                    <p className="text-xs text-slate-500 font-medium">Ganador</p>
-                    <p className="text-lg font-semibold text-emerald-700">
-                      {labelPareja(desafioDetalle.ganador_pareja_id)}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">🎾</span>
-                  <div>
-                    <p className="text-xs text-slate-500 font-medium">Desafío</p>
-                    <p className="text-[13px] font-semibold">
-                      {construirTituloDesafio(desafioDetalle)}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* VS (siempre por dúos) */}
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <p className="text-[13px] font-semibold">
-                  {labelPareja(desafioDetalle.retadora_pareja_id)}
-                </p>
-                <p className="text-xs text-slate-400 my-1 text-center">VS</p>
-                <p className="text-[13px] font-semibold">
-                  {labelPareja(desafioDetalle.retada_pareja_id)}
-                </p>
-              </div>
-            </div>
-
-            {/* Observación (si hay) */}
-            {desafioDetalle.observacion && (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-700 mb-4">
-                {desafioDetalle.observacion}
-              </div>
-            )}
-
-            {/* Resultado (sets) — ✅ AHORA CON NOMBRES */}
-            <div className="mb-4">
-              <p className="text-[13px] font-semibold mb-2">Resultado</p>
-
-              {(() => {
-                const sets = getSets(desafioDetalle);
-                if (!sets) {
-                  return (
-                    <p className="text-xs text-slate-400">
-                      Resultado no disponible (sets no presentes en el payload).
-                    </p>
-                  );
-                }
-
-                const nombres = getTitularRetadoras(desafioDetalle);
-
-                const bloques: Array<{
-                  label: string;
-                  r: any;
-                  d: any;
-                  show: boolean;
-                }> = [];
-
-                if (sets.set1) bloques.push({ label: "Set 1", r: sets.set1.r, d: sets.set1.d, show: true });
-                if (sets.set2) bloques.push({ label: "Set 2", r: sets.set2.r, d: sets.set2.d, show: true });
-
-                if (sets.set3) {
-                  const r = sets.set3.r;
-                  const d = sets.set3.d;
-                  const has = r !== null || d !== null;
-                  bloques.push({ label: "Super TB", r, d, show: has });
-                }
-
-                const visibles = bloques.filter((b) => b.show);
-                if (visibles.length === 0) {
-                  return (
-                    <p className="text-xs text-slate-400">
-                      Resultado no disponible (sets vacíos).
-                    </p>
-                  );
-                }
-
-                return (
-                  <div className="space-y-3">
-                    {visibles.map((b) => (
-                      <div key={b.label} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[12px] font-semibold text-slate-700">{b.label}</span>
-                          <span className="text-[11px] text-slate-400">Retadora vs Retada</span>
-                        </div>
-
-                        <div className="space-y-1 text-[12px]">
-                          <div className="flex items-center justify-between">
-                            <span className="text-slate-700">{nombres.retadora}</span>
-                            <span className="font-semibold text-slate-900">{b.r ?? "—"}</span>
-                          </div>
-
-                          <div className="flex items-center justify-between">
-                            <span className="text-slate-700">{nombres.retada}</span>
-                            <span className="font-semibold text-slate-900">{b.d ?? "—"}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* Cambio de posiciones (por DÚOS) */}
-            <div className="mb-4">
-              <p className="text-[13px] font-semibold mb-2">Cambio de posiciones</p>
-
-              {(() => {
-                const cambio = getCambioPosiciones(desafioDetalle);
-                if (!cambio) {
-                  return (
-                    <p className="text-xs text-slate-400">
-                      No hay datos de posiciones previas para este desafío.
-                    </p>
-                  );
-                }
-
-                const upOrDown = (oldPos: number, newPos: number) => {
-                  if (newPos < oldPos) return { icon: "⬆️", cls: "text-emerald-700" };
-                  if (newPos > oldPos) return { icon: "⬇️", cls: "text-red-600" };
-                  return { icon: "➡️", cls: "text-slate-500" };
-                };
-
-                const a = upOrDown(cambio.retadora.old, cambio.retadora.new);
-                const b = upOrDown(cambio.retada.old, cambio.retada.new);
-
-                return (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-[12px]">
-                      <span className="text-slate-700">
-                        {labelPareja(desafioDetalle.retadora_pareja_id)}
-                      </span>
-                      <span className={`font-semibold ${a.cls}`}>
-                        #{cambio.retadora.old} {a.icon} #{cambio.retadora.new}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-[12px]">
-                      <span className="text-slate-700">
-                        {labelPareja(desafioDetalle.retada_pareja_id)}
-                      </span>
-                      <span className={`font-semibold ${b.cls}`}>
-                        #{cambio.retada.old} {b.icon} #{cambio.retada.new}
-                      </span>
-                    </div>
-
-                    {/* mini info técnica */}
-                    <p className="text-[11px] text-slate-400">
-                      Swap aplicado: {desafioDetalle.swap_aplicado ? "Sí" : "No"} · Ranking aplicado:{" "}
-                      {desafioDetalle.ranking_aplicado ? "Sí" : "No"}
-                    </p>
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* Bloque admin / control */}
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 mb-4">
-              <p className="text-[12px] font-semibold text-slate-700 mb-2">Estado del desafío</p>
-              <div className="space-y-1 text-[12px] text-slate-700">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Estado:</span>
-                  <span className="font-semibold">{desafioDetalle.estado}</span>
+            <div className="px-6 py-4 border-b border-slate-100 bg-white">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold">Detalle del partido</h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Jugado: {getFechaJugadoLabel(desafioDetalle)}
+                  </p>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Ganador (pareja):</span>
-                  <span className="font-semibold">
-                    {desafioDetalle.ganador_pareja_id
-                      ? labelPareja(desafioDetalle.ganador_pareja_id)
-                      : "—"}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Última actualización:</span>
-                  <span className="font-semibold">{formatFechaHora(desafioDetalle.updated_at)}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Acciones (intacto) */}
-            <div className="flex flex-wrap gap-2 justify-end">
-              {desafioDetalle.estado === "Pendiente" && (
-                <>
-                  <button
-                    onClick={async () => {
-                      await handleAceptar(desafioDetalle.id);
-                      setDesafioDetalle(null);
-                    }}
-                    className="rounded-full bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700"
-                  >
-                    Aceptar
-                  </button>
-                  <button
-                    onClick={async () => {
-                      await handleRechazar(desafioDetalle.id);
-                      setDesafioDetalle(null);
-                    }}
-                    className="rounded-full border border-orange-300 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-50"
-                  >
-                    Rechazar
-                  </button>
-                </>
-              )}
-
-              {desafioDetalle.estado === "Aceptado" && (
-                <>
-                  <button
-                    onClick={() => {
-                      abrirModalResultado(desafioDetalle);
-                      setDesafioDetalle(null);
-                    }}
-                    className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
-                  >
-                    Cargar resultado
-                  </button>
-                  <button
-                    onClick={async () => {
-                      await handleRechazar(desafioDetalle.id);
-                      setDesafioDetalle(null);
-                    }}
-                    className="rounded-full border border-orange-300 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-50"
-                  >
-                    Rechazar
-                  </button>
-                </>
-              )}
-
-              {(desafioDetalle.estado === "Jugado" || desafioDetalle.estado === "Rechazado") && (
                 <button
-                  onClick={() => setDesafioDetalle(null)}
-                  className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                  type="button"
+                  onClick={cerrarDetalle}
+                  className="text-xs text-slate-500 hover:text-slate-700"
                 >
-                  OK
+                  Cerrar
                 </button>
+              </div>
+
+              <div className="flex items-center justify-between mt-3">
+                <BadgeEstado estado={desafioDetalle.estado} />
+                <span className="text-[11px] text-slate-400">ID: {desafioDetalle.id}</span>
+              </div>
+            </div>
+
+            {/* Body (scroll) */}
+            <div className="px-6 py-4 overflow-y-auto">
+              {/* Equipos + ganador */}
+              <div className="space-y-2 mb-4">
+                {desafioDetalle.estado === "Jugado" && desafioDetalle.ganador_pareja_id ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">🏆</span>
+                    <div>
+                      <p className="text-xs text-slate-500 font-medium">Ganador</p>
+                      <p className="text-lg font-semibold text-emerald-700">
+                        {labelPareja(desafioDetalle.ganador_pareja_id)}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">🎾</span>
+                    <div>
+                      <p className="text-xs text-slate-500 font-medium">Desafío</p>
+                      <p className="text-[13px] font-semibold">
+                        {construirTituloDesafio(desafioDetalle)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* ✅ Retador / Desafiado */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-slate-400">Retador</span>
+                    <span className="text-[11px] text-slate-400">Desafiado</span>
+                  </div>
+
+                  <div className="mt-1">
+                    <p className="text-[13px] font-semibold">
+                      {labelPareja(desafioDetalle.retadora_pareja_id)}
+                    </p>
+                    <p className="text-xs text-slate-400 my-1 text-center">VS</p>
+                    <p className="text-[13px] font-semibold">
+                      {labelPareja(desafioDetalle.retada_pareja_id)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {desafioDetalle.observacion && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-700 mb-4">
+                  {desafioDetalle.observacion}
+                </div>
               )}
+
+              {/* ✅ Resultado con nombres por set */}
+              <div className="mb-4">
+                <p className="text-[13px] font-semibold mb-2">Resultado</p>
+
+                {(() => {
+                  const sets = getSets(desafioDetalle);
+                  if (!sets) {
+                    return (
+                      <p className="text-xs text-slate-400">
+                        Resultado no disponible (sets no presentes en el payload).
+                      </p>
+                    );
+                  }
+
+                  const retador = labelPareja(desafioDetalle.retadora_pareja_id);
+                  const desafiado = labelPareja(desafioDetalle.retada_pareja_id);
+
+                  const cards: Array<{ title: string; r: any; d: any }> = [];
+                  if (sets.set1) cards.push({ title: "Set 1", r: sets.set1.r, d: sets.set1.d });
+                  if (sets.set2) cards.push({ title: "Set 2", r: sets.set2.r, d: sets.set2.d });
+
+                  if (sets.set3) {
+                    const r = sets.set3.r;
+                    const d = sets.set3.d;
+                    const has = r !== null || d !== null;
+                    if (has) cards.push({ title: "Super TB", r, d });
+                  }
+
+                  return (
+                    <div className="space-y-3">
+                      {cards.map((c) => (
+                        <div
+                          key={c.title}
+                          className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                        >
+                          <div className="flex items-center justify-between">
+                            <p className="text-[12px] font-semibold text-slate-700">{c.title}</p>
+                            <p className="text-[11px] text-slate-400">Retador vs Desafiado</p>
+                          </div>
+
+                          <div className="mt-2 space-y-2 text-[12px]">
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="text-slate-600 truncate">{retador}</span>
+                              <span className="font-semibold text-slate-900">{c.r ?? "—"}</span>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="text-slate-600 truncate">{desafiado}</span>
+                              <span className="font-semibold text-slate-900">{c.d ?? "—"}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Cambio de posiciones */}
+              <div className="mb-4">
+                <p className="text-[13px] font-semibold mb-2">Cambio de posiciones</p>
+
+                {(() => {
+                  const cambio = getCambioPosiciones(desafioDetalle);
+                  if (!cambio) {
+                    return (
+                      <p className="text-xs text-slate-400">
+                        No hay datos de posiciones previas para este desafío.
+                      </p>
+                    );
+                  }
+
+                  const upOrDown = (oldPos: number, newPos: number) => {
+                    if (newPos < oldPos) return { icon: "⬆️", cls: "text-emerald-700" };
+                    if (newPos > oldPos) return { icon: "⬇️", cls: "text-red-600" };
+                    return { icon: "➡️", cls: "text-slate-500" };
+                  };
+
+                  const a = upOrDown(cambio.retadora.old, cambio.retadora.new);
+                  const b = upOrDown(cambio.retada.old, cambio.retada.new);
+
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-[12px]">
+                        <span className="text-slate-700">
+                          {labelPareja(desafioDetalle.retadora_pareja_id)}
+                        </span>
+                        <span className={`font-semibold ${a.cls}`}>
+                          #{cambio.retadora.old} {a.icon} #{cambio.retadora.new}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-[12px]">
+                        <span className="text-slate-700">
+                          {labelPareja(desafioDetalle.retada_pareja_id)}
+                        </span>
+                        <span className={`font-semibold ${b.cls}`}>
+                          #{cambio.retada.old} {b.icon} #{cambio.retada.new}
+                        </span>
+                      </div>
+
+                      <p className="text-[11px] text-slate-400">
+                        Swap aplicado: {desafioDetalle.swap_aplicado ? "Sí" : "No"} · Ranking aplicado:{" "}
+                        {desafioDetalle.ranking_aplicado ? "Sí" : "No"}
+                      </p>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Estado */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 mb-4">
+                <p className="text-[12px] font-semibold text-slate-700 mb-2">Estado del desafío</p>
+                <div className="space-y-1 text-[12px] text-slate-700">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Estado:</span>
+                    <span className="font-semibold">{desafioDetalle.estado}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Ganador (pareja):</span>
+                    <span className="font-semibold">
+                      {desafioDetalle.ganador_pareja_id
+                        ? labelPareja(desafioDetalle.ganador_pareja_id)
+                        : "—"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Última actualización:</span>
+                    <span className="font-semibold">{formatFechaHora(desafioDetalle.updated_at)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer SIEMPRE visible */}
+            <div className="px-6 py-4 border-t border-slate-100 bg-white">
+              <div className="flex flex-wrap gap-2 justify-end">
+                {desafioDetalle.estado === "Pendiente" && (
+                  <>
+                    <button
+                      onClick={async () => {
+                        await handleAceptar(desafioDetalle.id);
+                        cerrarDetalle();
+                      }}
+                      className="rounded-full bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700"
+                    >
+                      Aceptar
+                    </button>
+                    <button
+                      onClick={async () => {
+                        await handleRechazar(desafioDetalle.id);
+                        cerrarDetalle();
+                      }}
+                      className="rounded-full border border-orange-300 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-50"
+                    >
+                      Rechazar
+                    </button>
+                  </>
+                )}
+
+                {desafioDetalle.estado === "Aceptado" && (
+                  <>
+                    <button
+                      onClick={() => {
+                        abrirModalResultado(desafioDetalle);
+                        cerrarDetalle();
+                      }}
+                      className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
+                    >
+                      Cargar resultado
+                    </button>
+                    <button
+                      onClick={async () => {
+                        await handleRechazar(desafioDetalle.id);
+                        cerrarDetalle();
+                      }}
+                      className="rounded-full border border-orange-300 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-50"
+                    >
+                      Rechazar
+                    </button>
+                  </>
+                )}
+
+                {(desafioDetalle.estado === "Jugado" || desafioDetalle.estado === "Rechazado") && (
+                  <button
+                    onClick={cerrarDetalle}
+                    className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                  >
+                    OK
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -1111,7 +1076,6 @@ const App: React.FC = () => {
         body={fgToast.body}
         onClose={() => setFgToast((t) => ({ ...t, open: false }))}
         onClick={() => {
-          // al click, abrimos el link (por ejemplo ?open_desafio=...)
           try {
             window.focus();
             window.location.assign(fgToast.url || "/");
