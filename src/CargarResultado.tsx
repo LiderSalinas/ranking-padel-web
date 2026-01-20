@@ -218,6 +218,7 @@ const CargarResultado: React.FC<Props> = ({ desafio, onClose, onSaved }) => {
     try {
       await cargarResultadoDesafio({
         desafio_id: desafio.id,
+         fecha_jugado: fechaJugado,
         set1_retador: n1R,
         set1_desafiado: n1D,
         set2_retador: n2R,
