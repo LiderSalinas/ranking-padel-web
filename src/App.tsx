@@ -161,7 +161,7 @@ const DesafiosView: React.FC<{
         const d = await getDesafioById(openDesafioId);
 
         // opcional: lo “inyectamos” arriba en items para que quede visible
-        setItems((prev) => {
+               setItems((prev) => {
           const exists = prev.some((x) => x.id === d.id);
           return exists ? prev : [d, ...prev];
         });
@@ -207,6 +207,31 @@ const DesafiosView: React.FC<{
   const labelPareja = (id: number | null | undefined): string => {
     if (!id) return "—";
     return mapaParejas.get(id) ?? `Pareja ${id}`;
+  };
+
+  // ✅ NUEVO: obtiene nombres retadora/retada para el detalle (robusto ante "VS" / "vs" / etc.)
+  // Prioriza el mapa (por ids). Si no hay mapa, cae al titulo_desafio.
+  const getTitularRetadoras = (d: Desafio): { retadora: string; retada: string } => {
+    const a = labelPareja(d.retadora_pareja_id);
+    const b = labelPareja(d.retada_pareja_id);
+
+    // si el mapa ya tiene nombres reales, listo
+    if (a !== `Pareja ${d.retadora_pareja_id}` || b !== `Pareja ${d.retada_pareja_id}`) {
+      return { retadora: a, retada: b };
+    }
+
+    // fallback: parsear titulo_desafio
+    const titulo = (d.titulo_desafio || "").trim();
+    if (!titulo) return { retadora: a, retada: b };
+
+    const parts = titulo.split(/ vs /i).map((x) => x.trim()).filter(Boolean);
+    if (parts.length >= 2) return { retadora: parts[0], retada: parts.slice(1).join(" vs ") };
+
+    // otro fallback: "VS"
+    const parts2 = titulo.split(/ VS /i).map((x) => x.trim()).filter(Boolean);
+    if (parts2.length >= 2) return { retadora: parts2[0], retada: parts2.slice(1).join(" VS ") };
+
+    return { retadora: a, retada: b };
   };
 
   const handleCrearChange = (
@@ -284,7 +309,6 @@ const DesafiosView: React.FC<{
     setDesafioSeleccionado(copia);
   };
 
-  const cerrarDetalle = () => setDesafioDetalle(null);
 
   const parejaRetadoraSeleccionada = parejas.find(
     (p) => String(p.id) === formCrear.retadora_pareja_id
@@ -584,7 +608,7 @@ const DesafiosView: React.FC<{
 
               <button
                 type="button"
-                onClick={cerrarDetalle}
+                onClick={() => setDesafioDetalle(null)}
                 className="text-xs text-slate-500 hover:text-slate-700"
               >
                 Cerrar
@@ -640,7 +664,7 @@ const DesafiosView: React.FC<{
               </div>
             )}
 
-            {/* Resultado (sets) */}
+            {/* Resultado (sets) — ✅ AHORA CON NOMBRES */}
             <div className="mb-4">
               <p className="text-[13px] font-semibold mb-2">Resultado</p>
 
@@ -654,27 +678,54 @@ const DesafiosView: React.FC<{
                   );
                 }
 
-                const lines: Array<{ label: string; r: any; d: any }> = [];
+                const nombres = getTitularRetadoras(desafioDetalle);
 
-                if (sets.set1) lines.push({ label: "Set 1", r: sets.set1.r, d: sets.set1.d });
-                if (sets.set2) lines.push({ label: "Set 2", r: sets.set2.r, d: sets.set2.d });
+                const bloques: Array<{
+                  label: string;
+                  r: any;
+                  d: any;
+                  show: boolean;
+                }> = [];
+
+                if (sets.set1) bloques.push({ label: "Set 1", r: sets.set1.r, d: sets.set1.d, show: true });
+                if (sets.set2) bloques.push({ label: "Set 2", r: sets.set2.r, d: sets.set2.d, show: true });
 
                 if (sets.set3) {
-                  // si set3 viene como null/null, lo ocultamos
                   const r = sets.set3.r;
                   const d = sets.set3.d;
                   const has = r !== null || d !== null;
-                  if (has) lines.push({ label: "Super TB", r, d });
+                  bloques.push({ label: "Super TB", r, d, show: has });
+                }
+
+                const visibles = bloques.filter((b) => b.show);
+                if (visibles.length === 0) {
+                  return (
+                    <p className="text-xs text-slate-400">
+                      Resultado no disponible (sets vacíos).
+                    </p>
+                  );
                 }
 
                 return (
-                  <div className="space-y-1 text-[12px] text-slate-700">
-                    {lines.map((x) => (
-                      <div key={x.label} className="flex items-center justify-between">
-                        <span className="text-slate-500">{x.label}:</span>
-                        <span className="font-semibold">
-                          {x.r ?? "—"} – {x.d ?? "—"}
-                        </span>
+                  <div className="space-y-3">
+                    {visibles.map((b) => (
+                      <div key={b.label} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[12px] font-semibold text-slate-700">{b.label}</span>
+                          <span className="text-[11px] text-slate-400">Retadora vs Retada</span>
+                        </div>
+
+                        <div className="space-y-1 text-[12px]">
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-700">{nombres.retadora}</span>
+                            <span className="font-semibold text-slate-900">{b.r ?? "—"}</span>
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-700">{nombres.retada}</span>
+                            <span className="font-semibold text-slate-900">{b.d ?? "—"}</span>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -767,7 +818,7 @@ const DesafiosView: React.FC<{
                   <button
                     onClick={async () => {
                       await handleAceptar(desafioDetalle.id);
-                      cerrarDetalle();
+                      setDesafioDetalle(null);
                     }}
                     className="rounded-full bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700"
                   >
@@ -776,7 +827,7 @@ const DesafiosView: React.FC<{
                   <button
                     onClick={async () => {
                       await handleRechazar(desafioDetalle.id);
-                      cerrarDetalle();
+                      setDesafioDetalle(null);
                     }}
                     className="rounded-full border border-orange-300 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-50"
                   >
@@ -790,7 +841,7 @@ const DesafiosView: React.FC<{
                   <button
                     onClick={() => {
                       abrirModalResultado(desafioDetalle);
-                      cerrarDetalle();
+                      setDesafioDetalle(null);
                     }}
                     className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
                   >
@@ -799,7 +850,7 @@ const DesafiosView: React.FC<{
                   <button
                     onClick={async () => {
                       await handleRechazar(desafioDetalle.id);
-                      cerrarDetalle();
+                      setDesafioDetalle(null);
                     }}
                     className="rounded-full border border-orange-300 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-50"
                   >
@@ -810,7 +861,7 @@ const DesafiosView: React.FC<{
 
               {(desafioDetalle.estado === "Jugado" || desafioDetalle.estado === "Rechazado") && (
                 <button
-                  onClick={cerrarDetalle}
+                  onClick={() => setDesafioDetalle(null)}
                   className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
                 >
                   OK
