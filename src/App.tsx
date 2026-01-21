@@ -1,4 +1,4 @@
-// src/App.tsx
+﻿// src/App.tsx
 import React, {
   useEffect,
   useMemo,
@@ -36,10 +36,7 @@ import {
 
 import ForegroundToast from "./components/ForegroundToast";
 
-// ✅ NUEVO: Splash fullscreen
-import SplashScreen from "./components/SplashScreen";
-
-
+// âœ… NUEVO: Splash fullscreen
 // Helper chiquito para mostrar 1/12, etc.
 function formatFecha(iso: string): string {
   try {
@@ -52,7 +49,7 @@ function formatFecha(iso: string): string {
   }
 }
 
-// ✅ Nuevo: formatea ISO "YYYY-MM-DDTHH:mm:ssZ" o similar a "dd/mm/yyyy – HH:MM"
+// âœ… Nuevo: formatea ISO "YYYY-MM-DDTHH:mm:ssZ" o similar a "dd/mm/yyyy â€“ HH:MM"
 function formatFechaHora(iso: string): string {
   try {
     const d = new Date(iso);
@@ -61,13 +58,13 @@ function formatFechaHora(iso: string): string {
     const anio = d.getFullYear().toString();
     const hh = d.getHours().toString().padStart(2, "0");
     const mm = d.getMinutes().toString().padStart(2, "0");
-    return `${dia}/${mes}/${anio} – ${hh}:${mm}`;
+    return `${dia}/${mes}/${anio} â€“ ${hh}:${mm}`;
   } catch {
     return iso;
   }
 }
 
-// ✅ Nuevo: arma un ISO a partir de fecha "YYYY-MM-DD" + hora "HH:MM:SS"
+// âœ… Nuevo: arma un ISO a partir de fecha "YYYY-MM-DD" + hora "HH:MM:SS"
 function joinFechaHoraIso(fecha: string, hora: string): string {
   const h = (hora || "00:00:00").slice(0, 8);
   return `${fecha}T${h}`;
@@ -85,13 +82,13 @@ const BadgeEstado: React.FC<{ estado: Estado }> = ({ estado }) => {
     Jugado: "bg-emerald-100 text-emerald-700",
   };
 
-  const label = estado === "Jugado" ? "🏆 Jugado" : estado;
+  const label = estado === "Jugado" ? "ðŸ† Jugado" : estado;
   return <span className={`${base} ${classes[estado]}`}>{label}</span>;
 };
 
 type TabId = "desafiosMasculinos" | "ranking" | "jugadores" | "desafiosFemeninos";
 
-// -------------------- VISTA PRINCIPAL (DESAFÍOS) --------------------
+// -------------------- VISTA PRINCIPAL (DESAFÃOS) --------------------
 const DesafiosView: React.FC<{
   onLogout: () => void;
   headerTitle: string;
@@ -115,7 +112,7 @@ const DesafiosView: React.FC<{
     observacion: "",
   });
 
-  // ✅ reprogramar
+  // âœ… reprogramar
   const [showReprogramar, setShowReprogramar] = useState(false);
   const [reprogramando, setReprogramando] = useState(false);
   const [reprogramarTarget, setReprogramarTarget] = useState<Desafio | null>(null);
@@ -152,7 +149,7 @@ const DesafiosView: React.FC<{
       setItems(sorted);
     } catch (err: any) {
       console.error(err);
-      setError(err?.message || "Error al cargar desafíos");
+      setError(err?.message || "Error al cargar desafÃ­os");
     } finally {
       setLoading(false);
     }
@@ -172,7 +169,7 @@ const DesafiosView: React.FC<{
     void cargarParejas();
   }, []);
 
-  // ✅ Abrir desafío desde notificación
+  // âœ… Abrir desafÃ­o desde notificaciÃ³n
   useEffect(() => {
     if (!openDesafioId) return;
     if (openHandledRef.current === openDesafioId) return;
@@ -200,7 +197,7 @@ const DesafiosView: React.FC<{
 
         setDesafioDetalle(d);
       } catch (e: any) {
-        alert(e?.message || "No se pudo abrir el desafío (no visible o sin permiso).");
+        alert(e?.message || "No se pudo abrir el desafÃ­o (no visible o sin permiso).");
       } finally {
         clearOpenDesafio?.();
       }
@@ -235,9 +232,9 @@ const DesafiosView: React.FC<{
     return `${d.retadora_pareja_id} vs ${d.retada_pareja_id}`;
   };
 
-  // ✅ etiquetas por DÚO
+  // âœ… etiquetas por DÃšO
   const labelPareja = (id: number | null | undefined): string => {
-    if (!id) return "—";
+    if (!id) return "â€”";
     return mapaParejas.get(id) ?? `Pareja ${id}`;
   };
 
@@ -255,10 +252,10 @@ const DesafiosView: React.FC<{
 
     try {
       if (!formCrear.retadora_pareja_id || !formCrear.retada_pareja_id) {
-        throw new Error("Seleccioná las dos parejas.");
+        throw new Error("SeleccionÃ¡ las dos parejas.");
       }
       if (!formCrear.fecha || !formCrear.hora) {
-        throw new Error("Completá fecha y hora.");
+        throw new Error("CompletÃ¡ fecha y hora.");
       }
 
       await crearDesafio({
@@ -282,7 +279,7 @@ const DesafiosView: React.FC<{
     } catch (err: any) {
       console.error(err);
       const detail = err?.detail || err?.message;
-      setError(detail || "No se pudo crear el desafío");
+      setError(detail || "No se pudo crear el desafÃ­o");
     } finally {
       setCreating(false);
     }
@@ -295,7 +292,7 @@ const DesafiosView: React.FC<{
       await cargarDesafios();
     } catch (err: any) {
       console.error(err);
-      setError(err?.message || "No se pudo aceptar el desafío");
+      setError(err?.message || "No se pudo aceptar el desafÃ­o");
     }
   };
 
@@ -306,7 +303,7 @@ const DesafiosView: React.FC<{
       await cargarDesafios();
     } catch (err: any) {
       console.error(err);
-      setError(err?.message || "No se pudo rechazar el desafío");
+      setError(err?.message || "No se pudo rechazar el desafÃ­o");
     }
   };
 
@@ -318,7 +315,7 @@ const DesafiosView: React.FC<{
 
   const cerrarDetalle = () => setDesafioDetalle(null);
 
-  // ✅ abrir reprogramar
+  // âœ… abrir reprogramar
   const abrirReprogramar = (d: Desafio) => {
     setReprogramarTarget(d);
     setFormReprogramar({
@@ -328,7 +325,7 @@ const DesafiosView: React.FC<{
     setShowReprogramar(true);
   };
 
-  // ✅ submit reprogramar
+  // âœ… submit reprogramar
   const handleSubmitReprogramar = async (e: FormEvent) => {
     e.preventDefault();
     if (!reprogramarTarget) return;
@@ -338,7 +335,7 @@ const DesafiosView: React.FC<{
       setError(null);
 
       if (!formReprogramar.fecha || !formReprogramar.hora) {
-        throw new Error("Completá fecha y hora.");
+        throw new Error("CompletÃ¡ fecha y hora.");
       }
 
       await reprogramarDesafio(reprogramarTarget.id, {
@@ -350,10 +347,10 @@ const DesafiosView: React.FC<{
       setReprogramarTarget(null);
 
       await cargarDesafios();
-      alert("✅ Desafío reprogramado y notificado.");
+      alert("âœ… DesafÃ­o reprogramado y notificado.");
     } catch (err: any) {
       console.error(err);
-      setError(err?.detail || err?.message || "No se pudo reprogramar el desafío");
+      setError(err?.detail || err?.message || "No se pudo reprogramar el desafÃ­o");
     } finally {
       setReprogramando(false);
     }
@@ -451,35 +448,35 @@ const DesafiosView: React.FC<{
                   const r = await tryAutoRegisterPush();
 
                   if (r.ok || r.reason === "already_registered") {
-                    alert("✅ Notificaciones ya estaban listas.");
+                    alert("âœ… Notificaciones ya estaban listas.");
                     return;
                   }
 
                   if (r.reason === "unsupported") {
                     alert(
                       r.message ||
-                        "Este navegador no soporta notificaciones. Abrí en Safari/Chrome."
+                        "Este navegador no soporta notificaciones. AbrÃ­ en Safari/Chrome."
                     );
                     return;
                   }
 
                   if (r.reason === "denied") {
                     alert(
-                      "⚠️ Tenés bloqueadas las notificaciones.\n\n" +
+                      "âš ï¸ TenÃ©s bloqueadas las notificaciones.\n\n" +
                         "iPhone: Ajustes > Notificaciones > (Safari/PWA)\n" +
-                        "Android: Configuración del sitio > Notificaciones"
+                        "Android: ConfiguraciÃ³n del sitio > Notificaciones"
                     );
                     return;
                   }
 
                   if (r.reason === "need_permission") {
                     await activarNotificacionesYGuardar();
-                    alert("✅ Notificaciones activadas");
+                    alert("âœ… Notificaciones activadas");
                     return;
                   }
 
                   if (r.reason === "no_session") {
-                    alert("⚠️ No hay sesión activa. Volvé a loguearte.");
+                    alert("âš ï¸ No hay sesiÃ³n activa. VolvÃ© a loguearte.");
                     return;
                   }
 
@@ -491,42 +488,42 @@ const DesafiosView: React.FC<{
               className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-indigo-600 text-white shadow-md hover:bg-indigo-700 active:scale-[0.96] transition"
               title="Notificaciones"
             >
-              <span className="text-xl">🔔</span>
+              <span className="text-xl">ðŸ””</span>
             </button>
 
             <button
               type="button"
               onClick={() => setShowCrear(true)}
               className="relative inline-flex h-11 w-11 items-center justify-center rounded-full bg-blue-600 text-white shadow-md hover:bg-blue-700 active:scale-[0.96] transition"
-              title="Nuevo desafío"
+              title="Nuevo desafÃ­o"
             >
-              <span className="text-xl">⚔️</span>
+              <span className="text-xl">âš”ï¸</span>
             </button>
 
             <button
               type="button"
               onClick={onLogout}
               className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-slate-800 text-white shadow-md hover:bg-slate-900 active:scale-[0.96] transition"
-              title="Cerrar sesión"
+              title="Cerrar sesiÃ³n"
             >
-              <span className="text-xl">🚪</span>
+              <span className="text-xl">ðŸšª</span>
             </button>
           </div>
         </header>
 
         <section className="bg-white rounded-2xl shadow-sm p-6 mt-2">
-          <h2 className="text-lg font-semibold text-center">Mis próximos desafíos</h2>
+          <h2 className="text-lg font-semibold text-center">Mis prÃ³ximos desafÃ­os</h2>
           <p className="text-xs text-center text-slate-500 mt-1">
-            Se muestran desafíos con estado Pendiente / Aceptado para el jugador autenticado.
+            Se muestran desafÃ­os con estado Pendiente / Aceptado para el jugador autenticado.
           </p>
 
           <div className="mt-6 space-y-3">
-            {loading && <p className="text-xs text-slate-400">Cargando desafíos…</p>}
+            {loading && <p className="text-xs text-slate-400">Cargando desafÃ­osâ€¦</p>}
 
             {!loading && error && <p className="text-sm text-red-500 text-center">{error}</p>}
 
             {!loading && !error && items.length === 0 && (
-              <p className="text-sm text-slate-400 text-center">No tenés desafíos próximos.</p>
+              <p className="text-sm text-slate-400 text-center">No tenÃ©s desafÃ­os prÃ³ximos.</p>
             )}
 
             {!loading &&
@@ -543,7 +540,7 @@ const DesafiosView: React.FC<{
                       <h3 className="text-[13px] font-semibold mb-1">{tituloUI}</h3>
 
                       <p className="text-[11px] text-slate-500">
-                        {formatFecha(d.fecha)} · {d.hora.slice(0, 5)}
+                        {formatFecha(d.fecha)} Â· {d.hora.slice(0, 5)}
                       </p>
 
                       {d.observacion && (
@@ -551,7 +548,7 @@ const DesafiosView: React.FC<{
                       )}
 
                       {d.estado === "Jugado" && (
-                        <p className="text-[11px] text-emerald-700 mt-1">🏅 Resultado cargado</p>
+                        <p className="text-[11px] text-emerald-700 mt-1">ðŸ… Resultado cargado</p>
                       )}
                     </div>
 
@@ -602,7 +599,7 @@ const DesafiosView: React.FC<{
                         )}
 
                         {d.estado === "Rechazado" && (
-                          <span className="text-[11px] text-slate-400">Desafío rechazado</span>
+                          <span className="text-[11px] text-slate-400">DesafÃ­o rechazado</span>
                         )}
 
                         {d.estado === "Jugado" && (
@@ -616,7 +613,7 @@ const DesafiosView: React.FC<{
                               const full = await getDesafioById(d.id);
                               setDesafioDetalle(full);
                             } catch (e) {
-                              console.warn("No se pudo traer detalle completo del desafío", e);
+                              console.warn("No se pudo traer detalle completo del desafÃ­o", e);
                             }
                           }}
                           className="rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
@@ -632,12 +629,12 @@ const DesafiosView: React.FC<{
         </section>
       </div>
 
-      {/* ✅ Modal REPROGRAMAR */}
+      {/* âœ… Modal REPROGRAMAR */}
       {showReprogramar && reprogramarTarget && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold">Reprogramar desafío</h3>
+              <h3 className="text-base font-semibold">Reprogramar desafÃ­o</h3>
               <button
                 type="button"
                 onClick={() => !reprogramando && setShowReprogramar(false)}
@@ -681,14 +678,14 @@ const DesafiosView: React.FC<{
                 disabled={reprogramando}
                 className="w-full mt-1 rounded-lg bg-indigo-600 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {reprogramando ? "Guardando…" : "Guardar reprogramación"}
+                {reprogramando ? "Guardandoâ€¦" : "Guardar reprogramaciÃ³n"}
               </button>
             </form>
           </div>
         </div>
       )}
 
-      {/* ✅ Modal DETALLE */}
+      {/* âœ… Modal DETALLE */}
       {desafioDetalle && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-3">
           <div className="w-full max-w-lg max-h-[92vh] rounded-2xl bg-white shadow-xl flex flex-col overflow-hidden">
@@ -720,7 +717,7 @@ const DesafiosView: React.FC<{
               <div className="space-y-2 mb-4">
                 {desafioDetalle.estado === "Jugado" && desafioDetalle.ganador_pareja_id ? (
                   <div className="flex items-center gap-2">
-                    <span className="text-xl">🏆</span>
+                    <span className="text-xl">ðŸ†</span>
                     <div>
                       <p className="text-xs text-slate-500 font-medium">Ganador</p>
                       <p className="text-lg font-semibold text-emerald-700">
@@ -730,9 +727,9 @@ const DesafiosView: React.FC<{
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <span className="text-xl">🎾</span>
+                    <span className="text-xl">ðŸŽ¾</span>
                     <div>
-                      <p className="text-xs text-slate-500 font-medium">Desafío</p>
+                      <p className="text-xs text-slate-500 font-medium">DesafÃ­o</p>
                       <p className="text-[13px] font-semibold">
                         {construirTituloDesafio(desafioDetalle)}
                       </p>
@@ -806,12 +803,12 @@ const DesafiosView: React.FC<{
                           <div className="mt-2 space-y-2 text-[12px]">
                             <div className="flex items-center justify-between gap-3">
                               <span className="text-slate-600 truncate">{retador}</span>
-                              <span className="font-semibold text-slate-900">{c.r ?? "—"}</span>
+                              <span className="font-semibold text-slate-900">{c.r ?? "â€”"}</span>
                             </div>
 
                             <div className="flex items-center justify-between gap-3">
                               <span className="text-slate-600 truncate">{desafiado}</span>
-                              <span className="font-semibold text-slate-900">{c.d ?? "—"}</span>
+                              <span className="font-semibold text-slate-900">{c.d ?? "â€”"}</span>
                             </div>
                           </div>
                         </div>
@@ -829,15 +826,15 @@ const DesafiosView: React.FC<{
                   if (!cambio) {
                     return (
                       <p className="text-xs text-slate-400">
-                        No hay datos de posiciones previas para este desafío.
+                        No hay datos de posiciones previas para este desafÃ­o.
                       </p>
                     );
                   }
 
                   const upOrDown = (oldPos: number, newPos: number) => {
-                    if (newPos < oldPos) return { icon: "⬆️", cls: "text-emerald-700" };
-                    if (newPos > oldPos) return { icon: "⬇️", cls: "text-red-600" };
-                    return { icon: "➡️", cls: "text-slate-500" };
+                    if (newPos < oldPos) return { icon: "â¬†ï¸", cls: "text-emerald-700" };
+                    if (newPos > oldPos) return { icon: "â¬‡ï¸", cls: "text-red-600" };
+                    return { icon: "âž¡ï¸", cls: "text-slate-500" };
                   };
 
                   const a = upOrDown(cambio.retadora.old, cambio.retadora.new);
@@ -864,8 +861,8 @@ const DesafiosView: React.FC<{
                       </div>
 
                       <p className="text-[11px] text-slate-400">
-                        Swap aplicado: {desafioDetalle.swap_aplicado ? "Sí" : "No"} · Ranking aplicado:{" "}
-                        {desafioDetalle.ranking_aplicado ? "Sí" : "No"}
+                        Swap aplicado: {desafioDetalle.swap_aplicado ? "SÃ­" : "No"} Â· Ranking aplicado:{" "}
+                        {desafioDetalle.ranking_aplicado ? "SÃ­" : "No"}
                       </p>
                     </div>
                   );
@@ -873,7 +870,7 @@ const DesafiosView: React.FC<{
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 mb-4">
-                <p className="text-[12px] font-semibold text-slate-700 mb-2">Estado del desafío</p>
+                <p className="text-[12px] font-semibold text-slate-700 mb-2">Estado del desafÃ­o</p>
                 <div className="space-y-1 text-[12px] text-slate-700">
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">Estado:</span>
@@ -885,12 +882,12 @@ const DesafiosView: React.FC<{
                     <span className="font-semibold">
                       {desafioDetalle.ganador_pareja_id
                         ? labelPareja(desafioDetalle.ganador_pareja_id)
-                        : "—"}
+                        : "â€”"}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Última actualización:</span>
+                    <span className="text-slate-500">Ãšltima actualizaciÃ³n:</span>
                     <span className="font-semibold">{formatFechaHora(desafioDetalle.updated_at)}</span>
                   </div>
                 </div>
@@ -970,12 +967,12 @@ const DesafiosView: React.FC<{
         </div>
       )}
 
-      {/* Modal NUEVO DESAFÍO */}
+      {/* Modal NUEVO DESAFÃO */}
       {showCrear && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold">Nuevo desafío</h3>
+              <h3 className="text-base font-semibold">Nuevo desafÃ­o</h3>
               <button
                 type="button"
                 onClick={() => !creating && setShowCrear(false)}
@@ -988,15 +985,15 @@ const DesafiosView: React.FC<{
             {parejaRetadoraSeleccionada && parejaRetadaSeleccionada && (
               <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] space-y-1">
                 <p className="flex items-center gap-1">
-                  <span className="text-pink-500">🔑</span>
+                  <span className="text-pink-500">ðŸ”‘</span>
                   <span>
                     {etiquetaRetadora} VS {etiquetaRetada}
                   </span>
                 </p>
                 {puestoEnJuego && (
                   <p className="flex items-center gap-1 text-amber-700">
-                    <span>🏅</span>
-                    <span>Puesto en juego: N.º {puestoEnJuego}</span>
+                    <span>ðŸ…</span>
+                    <span>Puesto en juego: N.Âº {puestoEnJuego}</span>
                   </p>
                 )}
               </div>
@@ -1015,7 +1012,7 @@ const DesafiosView: React.FC<{
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     required
                   >
-                    <option value="">Seleccionar…</option>
+                    <option value="">Seleccionarâ€¦</option>
                     {opcionesParejas.map((p) => (
                       <option key={p.value} value={p.value}>
                         {p.label}
@@ -1035,7 +1032,7 @@ const DesafiosView: React.FC<{
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     required
                   >
-                    <option value="">Seleccionar…</option>
+                    <option value="">Seleccionarâ€¦</option>
                     {opcionesParejas.map((p) => (
                       <option key={p.value} value={p.value}>
                         {p.label}
@@ -1071,7 +1068,7 @@ const DesafiosView: React.FC<{
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Observación</label>
+                <label className="block text-xs font-medium text-slate-600 mb-1">ObservaciÃ³n</label>
                 <textarea
                   name="observacion"
                   value={formCrear.observacion}
@@ -1087,7 +1084,7 @@ const DesafiosView: React.FC<{
                 disabled={creating}
                 className="w-full mt-1 rounded-lg bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {creating ? "Creando…" : "Crear desafío"}
+                {creating ? "Creandoâ€¦" : "Crear desafÃ­o"}
               </button>
             </form>
           </div>
@@ -1111,16 +1108,14 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>("desafiosMasculinos");
   const [openDesafioId, setOpenDesafioId] = useState<number | null>(null);
 
-  // ✅ NUEVO: Splash state
-  const [showSplash, setShowSplash] = useState(true);
-
-  // ✅ ranking menu/detalle + filtro seleccionado
+  // âœ… NUEVO: Splash state
+  // âœ… ranking menu/detalle + filtro seleccionado
   const [rankingScreen, setRankingScreen] = useState<"menu" | "detalle">("menu");
   const [rankingFilter, setRankingFilter] = useState<{ genero: "M" | "F"; grupo: "A" | "B" | "C" }>(
     { genero: "M", grupo: "B" }
   );
 
-  // ✅ toast para foreground
+  // âœ… toast para foreground
   const [fgToast, setFgToast] = useState<{ open: boolean; title: string; body: string; url: string }>(
     {
       open: false,
@@ -1130,22 +1125,10 @@ const App: React.FC = () => {
     }
   );
 
-  // ✅ NUEVO: Splash auto-hide (ajustá el tiempo si querés)
+  // âœ… NUEVO: Splash auto-hide (ajustÃ¡ el tiempo si querÃ©s)
   useEffect(() => {
-    const t = window.setTimeout(() => setShowSplash(false), 1200);
-    return () => window.clearTimeout(t);
-  }, []);
-
-  // ✅ NUEVO: evita scroll mientras está el splash (súper importante para “pantalla completa”)
+  // âœ… NUEVO: evita scroll mientras estÃ¡ el splash (sÃºper importante para â€œpantalla completaâ€)
   useEffect(() => {
-    if (!showSplash) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [showSplash]);
-
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
     const v = sp.get("open_desafio");
@@ -1183,20 +1166,20 @@ const App: React.FC = () => {
 
   const headerByTab: Record<TabId, { title: string; subtitle: string }> = {
     desafiosMasculinos: {
-      title: "🏆 Ranking Pádel Oficial",
-      subtitle: "Sistema oficial de desafíos, resultados y posiciones.",
+      title: "ðŸ† Ranking PÃ¡del Oficial",
+      subtitle: "Sistema oficial de desafÃ­os, resultados y posiciones.",
     },
     ranking: {
-      title: "📊 Ranking General",
-      subtitle: "Tabla de posiciones y estadísticas del torneo.",
+      title: "ðŸ“Š Ranking General",
+      subtitle: "Tabla de posiciones y estadÃ­sticas del torneo.",
     },
     jugadores: {
-      title: "👥 Jugadores",
+      title: "ðŸ‘¥ Jugadores",
       subtitle: "Listado de jugadores registrados en el sistema.",
     },
     desafiosFemeninos: {
-      title: "🎾 Desafíos Femeninos",
-      subtitle: "Desafíos A | B | C (pendiente de implementación).",
+      title: "ðŸŽ¾ DesafÃ­os Femeninos",
+      subtitle: "DesafÃ­os A | B | C (pendiente de implementaciÃ³n).",
     },
   };
 
@@ -1209,11 +1192,10 @@ const App: React.FC = () => {
     setIsLogged(false);
   };
 
-  // ✅ NUEVO: Splash va arriba de todo (antes de login o app)
-  // Tip: si querés que NO se pueda saltar, sacá onSkip.
+  // âœ… NUEVO: Splash va arriba de todo (antes de login o app)
+  // Tip: si querÃ©s que NO se pueda saltar, sacÃ¡ onSkip.
   return (
     <div className="min-h-screen flex flex-col bg-slate-100">
-      {showSplash && <SplashScreen onSkip={() => setShowSplash(false)} />}
 
       {!isLogged ? (
         <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
@@ -1271,7 +1253,7 @@ const App: React.FC = () => {
 
             {activeTab === "desafiosFemeninos" && (
               <div className="min-h-[calc(100vh-120px)] flex items-center justify-center text-xs text-slate-400">
-                Desafíos femeninos A/B/C (pendiente).
+                DesafÃ­os femeninos A/B/C (pendiente).
               </div>
             )}
           </main>
@@ -1285,8 +1267,8 @@ const App: React.FC = () => {
                   activeTab === "desafiosMasculinos" ? "text-sky-600" : "text-slate-400"
                 }`}
               >
-                <span className="text-lg">🎾</span>
-                <span>Desafíos Masc.</span>
+                <span className="text-lg">ðŸŽ¾</span>
+                <span>DesafÃ­os Masc.</span>
                 <span className="text-[10px]">A | B | C</span>
               </button>
 
@@ -1300,7 +1282,7 @@ const App: React.FC = () => {
                   activeTab === "ranking" ? "text-sky-600" : "text-slate-400"
                 }`}
               >
-                <span className="text-lg">📊</span>
+                <span className="text-lg">ðŸ“Š</span>
                 <span>Ranking</span>
                 <span className="text-[10px]">General</span>
               </button>
@@ -1312,7 +1294,7 @@ const App: React.FC = () => {
                   activeTab === "jugadores" ? "text-sky-600" : "text-slate-400"
                 }`}
               >
-                <span className="text-lg">👥</span>
+                <span className="text-lg">ðŸ‘¥</span>
                 <span>Jugadores</span>
               </button>
 
@@ -1323,8 +1305,8 @@ const App: React.FC = () => {
                   activeTab === "desafiosFemeninos" ? "text-sky-600" : "text-slate-400"
                 }`}
               >
-                <span className="text-lg">🎾</span>
-                <span>Desafíos Fem.</span>
+                <span className="text-lg">ðŸŽ¾</span>
+                <span>DesafÃ­os Fem.</span>
                 <span className="text-[10px]">A | B | C</span>
               </button>
             </div>
@@ -1336,3 +1318,11 @@ const App: React.FC = () => {
 };
 
 export default App;
+
+
+
+
+
+
+
+
