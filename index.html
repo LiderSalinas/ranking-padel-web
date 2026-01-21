@@ -13,24 +13,55 @@
     <!-- ✅ Fix warning (Android/Chrome) -->
     <meta name="mobile-web-app-capable" content="yes" />
 
-    <!-- ✅ Nombre (algunos navegadores lo usan como fallback) -->
+    <!-- ✅ Nombre -->
     <meta name="application-name" content="Ranking Padel Oficial" />
     <meta name="apple-mobile-web-app-title" content="Ranking Padel Oficial" />
 
-    <!-- ✅ Iconos propios (NO Vite) -->
+    <!-- ✅ Iconos -->
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
 
-    <!-- ✅ iOS (recomendado) -->
+    <!-- ✅ iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-
-    <!-- ✅ iOS: evita que números se vuelvan links -->
     <meta name="format-detection" content="telephone=no" />
 
     <title>Ranking Padel Oficial</title>
+
+    <!-- ✅ SPLASH FULLSCREEN (fake splash) -->
+    <style>
+      #splash-screen {
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+        background: #0f4b8c;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #splash-screen img {
+        width: 100vw;
+        height: 100vh;
+        object-fit: cover; /* ✅ imagen completa */
+        display: block;
+      }
+
+      /* cuando se oculta */
+      #splash-screen.hidden {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 200ms ease;
+      }
+    </style>
   </head>
+
   <body>
+    <!-- ✅ splash antes de React -->
+    <div id="splash-screen">
+      <img src="/splash.jpg" alt="Ranking Padel Oficial" />
+    </div>
+
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
