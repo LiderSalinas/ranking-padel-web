@@ -28,41 +28,49 @@ const CargarResultado: React.FC<Props> = ({ desafio, onClose, onSaved }) => {
   const [set2R, setSet2R] = useState("");
   const [set2D, setSet2D] = useState("");
 
-  // Set 3 opcional
+  // Set 3 (Super TB) opcional
   const [set3R, setSet3R] = useState("");
   const [set3D, setSet3D] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // ✅ ADD: bandera anti doble submit (por lag / doble tap)
+  // ✅ anti doble submit
   const [submitted, setSubmitted] = useState(false);
 
-  // ✅ ADD: si ya está Jugado, no debería permitir guardar (extra safety)
   const yaJugado =
     String((desafio as any)?.estado ?? "").toLowerCase() === "jugado";
 
-  // Helper: spinner 0–7, sin negativos ni locuras
-  const handleScoreChange =
+  // ✅ Set 1/2: clamp 0–7
+  const handleScoreChangeGames =
     (setter: (v: string) => void) =>
     (e: ChangeEvent<HTMLInputElement>) => {
       const raw = e.target.value;
-
-      // permitir borrar para reescribir
       if (raw === "") {
         setter("");
         return;
       }
-
       const n = Number(raw);
       if (Number.isNaN(n)) return;
-
-      // clamp 0–7
       const clamped = Math.min(7, Math.max(0, n));
       setter(String(clamped));
     };
 
-  // Nombres de parejas a partir del título "X VS Y"
+  // ✅ Set 3 (Super TB): clamp 0–99 (sin límite 7)
+  const handleScoreChangeTB =
+    (setter: (v: string) => void) =>
+    (e: ChangeEvent<HTMLInputElement>) => {
+      const raw = e.target.value;
+      if (raw === "") {
+        setter("");
+        return;
+      }
+      const n = Number(raw);
+      if (Number.isNaN(n)) return;
+      const clamped = Math.min(99, Math.max(0, n));
+      setter(String(clamped));
+    };
+
   const [nombreRetadora, nombreRetada] = useMemo(() => {
     const titulo = desafio.titulo_desafio ?? "";
     const partes = titulo.split(" VS ");
@@ -71,7 +79,7 @@ const CargarResultado: React.FC<Props> = ({ desafio, onClose, onSaved }) => {
     return [left || "Retador", right || "Desafiado"];
   }, [desafio.titulo_desafio]);
 
-  // Mostrar 3er set solo si hay empate 1–1 en sets
+  // Mostrar 3er set solo si hay empate 1–1
   const showSet3 = useMemo(() => {
     const n1R = Number(set1R);
     const n1D = Number(set1D);
@@ -92,14 +100,9 @@ const CargarResultado: React.FC<Props> = ({ desafio, onClose, onSaved }) => {
     const ganoR2 = n2R > n2D;
     const ganoD2 = n2D > n2R;
 
-    // cada uno ganó un set → 1–1
-    if ((ganoR1 && ganoD2) || (ganoD1 && ganoR2)) {
-      return true;
-    }
-    return false;
+    return (ganoR1 && ganoD2) || (ganoD1 && ganoR2);
   }, [set1R, set1D, set2R, set2D]);
 
-  // Si deja de haber empate, limpiamos el 3er set
   useEffect(() => {
     if (!showSet3) {
       setSet3R("");
@@ -107,13 +110,11 @@ const CargarResultado: React.FC<Props> = ({ desafio, onClose, onSaved }) => {
     }
   }, [showSet3]);
 
-  // ✅ ADD: si cambiás de desafío, reseteamos protección de submit
   useEffect(() => {
     setSubmitted(false);
     setErrorMsg(null);
   }, [desafio?.id]);
 
-  // Texto tipo “30/11/2025 · 22:00 hs · ID #10”
   const fechaProgramado = (() => {
     try {
       const d = new Date(desafio.fecha);
@@ -131,10 +132,8 @@ const CargarResultado: React.FC<Props> = ({ desafio, onClose, onSaved }) => {
     e.preventDefault();
     setErrorMsg(null);
 
-    // ✅ ADD: bloqueo por doble click / doble tap
     if (loading || submitted) return;
 
-    // ✅ ADD: si ya está Jugado, evitamos re-guardar
     if (yaJugado) {
       setErrorMsg(
         "Este desafío ya está marcado como Jugado. No se puede volver a guardar el resultado.",
@@ -142,9 +141,8 @@ const CargarResultado: React.FC<Props> = ({ desafio, onClose, onSaved }) => {
       return;
     }
 
-    // Validación mínima: Set1 y Set2 obligatorios
     if (!set1R || !set1D || !set2R || !set2D) {
-      setErrorMsg("Completá Set 1 y Set 2 para ambas parejas.");
+      setErrorMsg("Completá Set 1 y Set 2 para ambas duplas.");
       return;
     }
 
@@ -163,28 +161,27 @@ const CargarResultado: React.FC<Props> = ({ desafio, onClose, onSaved }) => {
       return;
     }
 
-    // rango 0–7 para set 1 y 2
+    // rango 0–7 set 1 y 2
     if (
-      n1R < 0 ||
-      n1R > 7 ||
-      n1D < 0 ||
-      n1D > 7 ||
-      n2R < 0 ||
-      n2R > 7 ||
-      n2D < 0 ||
-      n2D > 7
+      n1R < 0 || n1R > 7 || n1D < 0 || n1D > 7 ||
+      n2R < 0 || n2R > 7 || n2D < 0 || n2D > 7
     ) {
-      setErrorMsg("Los games deben estar entre 0 y 7.");
+      setErrorMsg("Los games de Set 1 y Set 2 deben estar entre 0 y 7.");
       return;
     }
 
-    // ✅ ADD: evitar empates en sets
     if (n1R === n1D) {
       setErrorMsg("El Set 1 no puede terminar empatado.");
       return;
     }
     if (n2R === n2D) {
       setErrorMsg("El Set 2 no puede terminar empatado.");
+      return;
+    }
+
+    // ✅ Set 3 obligatorio si showSet3
+    if (showSet3 && (!set3R || !set3D)) {
+      setErrorMsg("Como van 1–1, tenés que cargar el Super Tie-Break (Set 3).");
       return;
     }
 
@@ -196,29 +193,27 @@ const CargarResultado: React.FC<Props> = ({ desafio, onClose, onSaved }) => {
       return;
     }
 
+    // ✅ Super TB: 0–99
     if (
-      (n3R !== null && (n3R < 0 || n3R > 7)) ||
-      (n3D !== null && (n3D < 0 || n3D > 7))
+      (n3R !== null && (n3R < 0 || n3R > 99)) ||
+      (n3D !== null && (n3D < 0 || n3D > 99))
     ) {
-      setErrorMsg("En el 3er set los games también deben estar entre 0 y 7.");
+      setErrorMsg("Super Tie-Break: valores entre 0 y 99.");
       return;
     }
 
-    // ✅ ADD: empate en 3er set
     if (showSet3 && n3R !== null && n3D !== null && n3R === n3D) {
-      setErrorMsg("El Set 3 no puede terminar empatado.");
+      setErrorMsg("El Super Tie-Break no puede terminar empatado.");
       return;
     }
 
     setLoading(true);
-
-    // ✅ ADD: marcamos como enviado para evitar doble envío
     setSubmitted(true);
 
     try {
       await cargarResultadoDesafio({
         desafio_id: desafio.id,
-         fecha_jugado: fechaJugado,
+        fecha_jugado: fechaJugado,
         set1_retador: n1R,
         set1_desafiado: n1D,
         set2_retador: n2R,
@@ -227,16 +222,12 @@ const CargarResultado: React.FC<Props> = ({ desafio, onClose, onSaved }) => {
         set3_desafiado: n3D,
       });
 
-      // ✅ refrescar data del padre
       await Promise.resolve(onSaved());
-
       onClose();
     } catch (err: any) {
       console.error(err);
       const detail = err?.detail || err?.message || "No se pudo guardar el resultado.";
       setErrorMsg(detail);
-
-      // ✅ ADD: si falló, permitimos reintentar
       setSubmitted(false);
     } finally {
       setLoading(false);
@@ -244,10 +235,10 @@ const CargarResultado: React.FC<Props> = ({ desafio, onClose, onSaved }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40">
-      <div className="w-full max-w-xl max-h-[90vh] rounded-2xl bg-white shadow-2xl flex flex-col">
-        {/* HEADER AZUL, TIPO APPSHEET */}
-        <div className="flex items-center justify-between px-5 py-3 bg-blue-600 text-white rounded-t-2xl">
+    <div className="fixed inset-0 z-40 flex items-start justify-center bg-slate-900/40 p-3">
+      <div className="w-full max-w-lg h-[92vh] rounded-2xl bg-white shadow-2xl flex flex-col overflow-hidden">
+        {/* HEADER */}
+        <div className="flex items-center justify-between px-5 py-3 bg-blue-600 text-white">
           <button
             type="button"
             onClick={onClose}
@@ -274,13 +265,12 @@ const CargarResultado: React.FC<Props> = ({ desafio, onClose, onSaved }) => {
           </button>
         </div>
 
-        {/* CUERPO DEL FORM */}
+        {/* FORM */}
         <form
           id="form-cargar-resultado"
           onSubmit={handleSubmit}
-          className="px-5 py-4 space-y-4 overflow-y-auto text-sm"
+          className="px-5 py-4 space-y-4 overflow-y-auto text-sm min-h-0"
         >
-          {/* Info del partido (estilo AppSheet con emojis) */}
           <section className="border-b border-slate-200 pb-3 space-y-1">
             <p className="text-[11px] text-slate-600 flex gap-1">
               <span>📄</span>
@@ -303,7 +293,7 @@ const CargarResultado: React.FC<Props> = ({ desafio, onClose, onSaved }) => {
           {/* Fecha jugado */}
           <section className="border-b border-slate-200 pb-3">
             <label className="block text-xs font-medium text-slate-600 mb-1">
-              Fecha jugado
+              Fecha que se jugó
             </label>
             <input
               type="date"
@@ -316,7 +306,7 @@ const CargarResultado: React.FC<Props> = ({ desafio, onClose, onSaved }) => {
           {/* Sets */}
           <section className="space-y-3">
             <p className="text-[11px] text-slate-500">
-              Mejor de 3 sets · el 3er set aparece solo si hay empate 1–1
+              Mejor de 3 sets · 3er set = Super Tie-Break (sin límite “7”)
             </p>
 
             {/* Set 1 */}
@@ -336,9 +326,8 @@ const CargarResultado: React.FC<Props> = ({ desafio, onClose, onSaved }) => {
                     max={7}
                     step={1}
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    placeholder={nombreRetadora}
                     value={set1R}
-                    onChange={handleScoreChange(setSet1R)}
+                    onChange={handleScoreChangeGames(setSet1R)}
                     disabled={loading}
                   />
                 </div>
@@ -356,9 +345,8 @@ const CargarResultado: React.FC<Props> = ({ desafio, onClose, onSaved }) => {
                     max={7}
                     step={1}
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    placeholder={nombreRetada}
                     value={set1D}
-                    onChange={handleScoreChange(setSet1D)}
+                    onChange={handleScoreChangeGames(setSet1D)}
                     disabled={loading}
                   />
                 </div>
@@ -382,9 +370,8 @@ const CargarResultado: React.FC<Props> = ({ desafio, onClose, onSaved }) => {
                     max={7}
                     step={1}
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    placeholder={nombreRetadora}
                     value={set2R}
-                    onChange={handleScoreChange(setSet2R)}
+                    onChange={handleScoreChangeGames(setSet2R)}
                     disabled={loading}
                   />
                 </div>
@@ -402,9 +389,8 @@ const CargarResultado: React.FC<Props> = ({ desafio, onClose, onSaved }) => {
                     max={7}
                     step={1}
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    placeholder={nombreRetada}
                     value={set2D}
-                    onChange={handleScoreChange(setSet2D)}
+                    onChange={handleScoreChangeGames(setSet2D)}
                     disabled={loading}
                   />
                 </div>
@@ -416,10 +402,10 @@ const CargarResultado: React.FC<Props> = ({ desafio, onClose, onSaved }) => {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <p className="text-xs font-semibold text-slate-700">
-                    Set 3 (desempate)
+                    Set 3 (Super Tie-Break)
                   </p>
                   <span className="text-[11px] text-slate-400">
-                    Solo si se jugó 3er set
+                    A 10 (o más si siguen)
                   </span>
                 </div>
                 <div className="flex gap-2">
@@ -433,12 +419,11 @@ const CargarResultado: React.FC<Props> = ({ desafio, onClose, onSaved }) => {
                     <input
                       type="number"
                       min={0}
-                      max={7}
+                      max={99}
                       step={1}
                       className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                      placeholder={nombreRetadora}
                       value={set3R}
-                      onChange={handleScoreChange(setSet3R)}
+                      onChange={handleScoreChangeTB(setSet3R)}
                       disabled={loading}
                     />
                   </div>
@@ -453,12 +438,11 @@ const CargarResultado: React.FC<Props> = ({ desafio, onClose, onSaved }) => {
                     <input
                       type="number"
                       min={0}
-                      max={7}
+                      max={99}
                       step={1}
                       className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                      placeholder={nombreRetada}
                       value={set3D}
-                      onChange={handleScoreChange(setSet3D)}
+                      onChange={handleScoreChangeTB(setSet3D)}
                       disabled={loading}
                     />
                   </div>
@@ -470,8 +454,8 @@ const CargarResultado: React.FC<Props> = ({ desafio, onClose, onSaved }) => {
           {errorMsg && <p className="text-xs text-red-500">{errorMsg}</p>}
         </form>
 
-        {/* FOOTER BOTONES */}
-        <div className="flex items-center justify-between px-5 py-3 border-t border-slate-200 bg-slate-50 rounded-b-2xl">
+        {/* FOOTER */}
+        <div className="flex items-center justify-between px-5 py-3 border-t border-slate-200 bg-slate-50">
           <button
             type="button"
             onClick={onClose}

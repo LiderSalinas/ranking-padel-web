@@ -1,4 +1,4 @@
-// src/App.tsx
+﻿// src/App.tsx
 import React, { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 
 import type { Desafio } from "./types/desafios";
@@ -6,30 +6,30 @@ import type { ParejaDesafiable } from "./types/parejas";
 
 import {
   getMisProximosDesafios,
-  getDesafioById, // ✅ nuevo
+  getDesafioById,
   crearDesafio,
   aceptarDesafio,
   rechazarDesafio,
-  reprogramarDesafio, // ✅ NUEVO
+  reprogramarDesafio,
 } from "./services/desafio";
 import { getParejasDesafiables } from "./services/parejas";
 import Login from "./views/Auth/Login";
 import { logout } from "./services/auth";
 import CargarResultado from "./CargarResultado";
 import RankingView from "./views/Ranking";
-import RankingMenu from "./views/RankingMenu"; // ✅ NUEVO (MENÚ)
+import RankingMenu from "./views/RankingMenu";
 import JugadoresView from "./views/Jugadores";
 
 import {
   activarNotificacionesYGuardar,
   listenForegroundPush,
   tryAutoRegisterPush,
-  setOnForegroundToast, // ✅ NUEVO
+  setOnForegroundToast,
 } from "./push";
 
-import ForegroundToast from "./components/ForegroundToast"; // ✅ NUEVO
+import ForegroundToast from "./components/ForegroundToast";
 
-// Helper chiquito para mostrar 1/12, etc.
+// Helper 1/12
 function formatFecha(iso: string): string {
   try {
     const d = new Date(iso);
@@ -41,7 +41,6 @@ function formatFecha(iso: string): string {
   }
 }
 
-// ✅ Nuevo: formatea ISO "YYYY-MM-DDTHH:mm:ssZ" o similar a "dd/mm/yyyy – HH:MM"
 function formatFechaHora(iso: string): string {
   try {
     const d = new Date(iso);
@@ -56,11 +55,31 @@ function formatFechaHora(iso: string): string {
   }
 }
 
-// ✅ Nuevo: arma un ISO a partir de fecha "YYYY-MM-DD" + hora "HH:MM:SS"
 function joinFechaHoraIso(fecha: string, hora: string): string {
-  // ojo: sin timezone; igual sirve para mostrar algo coherente
   const h = (hora || "00:00:00").slice(0, 8);
   return `${fecha}T${h}`;
+}
+
+// ✅ NUEVO: “pegar” hora a :00
+function snapToHour(value: string): string {
+  const v = (value || "").trim();
+  if (!v) return v;
+  const hh = v.slice(0, 2);
+  return `${hh}:00`;
+}
+
+// ✅ NUEVO: weekday en español + formato “Miércoles 21 / 18:00 hs”
+function formatFechaJugadoBonita(fechaYYYYMMDD: string, horaHHMM: string): string {
+  try {
+    const d = new Date(`${fechaYYYYMMDD}T00:00:00`);
+    const dias = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+    const label = dias[d.getDay()];
+    const dia = d.getDate().toString();
+    const hhmm = (horaHHMM || "00:00").slice(0, 5);
+    return `${label} ${dia} / ${hhmm} hs`;
+  } catch {
+    return `${fechaYYYYMMDD} / ${(horaHHMM || "00:00").slice(0, 5)} hs`;
+  }
 }
 
 type Estado = Desafio["estado"];
@@ -81,7 +100,6 @@ const BadgeEstado: React.FC<{ estado: Estado }> = ({ estado }) => {
 
 type TabId = "desafiosMasculinos" | "ranking" | "jugadores" | "desafiosFemeninos";
 
-// -------------------- VISTA PRINCIPAL (DESAFÍOS) --------------------
 const DesafiosView: React.FC<{
   onLogout: () => void;
   headerTitle: string;
@@ -105,7 +123,6 @@ const DesafiosView: React.FC<{
     observacion: "",
   });
 
-  // ✅ NUEVO: reprogramar
   const [showReprogramar, setShowReprogramar] = useState(false);
   const [reprogramando, setReprogramando] = useState(false);
   const [reprogramarTarget, setReprogramarTarget] = useState<Desafio | null>(null);
@@ -123,7 +140,11 @@ const DesafiosView: React.FC<{
 
       const data = await getMisProximosDesafios();
 
-      // ✅ NUEVO: Orden visual -> Pendiente primero, luego Aceptado, luego Jugado/Rechazado
+      // ✅ Orden principal: MÁS RECIENTE primero (fecha/hora DESC)
+      const dt = (x: Desafio) =>
+        new Date(`${x.fecha}T${(x.hora || "00:00:00").slice(0, 8)}`).getTime();
+
+      // secundario: estados por “importancia” (si misma fecha/hora)
       const order: Record<string, number> = {
         Pendiente: 0,
         Aceptado: 1,
@@ -132,13 +153,13 @@ const DesafiosView: React.FC<{
       };
 
       const sorted = [...data].sort((a, b) => {
+        const ta = dt(a);
+        const tb = dt(b);
+        if (tb !== ta) return tb - ta;
+
         const oa = order[a.estado] ?? 99;
         const ob = order[b.estado] ?? 99;
-        if (oa !== ob) return oa - ob;
-
-        const da = new Date(`${a.fecha}T${(a.hora || "00:00:00").slice(0, 8)}`).getTime();
-        const db = new Date(`${b.fecha}T${(b.hora || "00:00:00").slice(0, 8)}`).getTime();
-        return da - db;
+        return oa - ob;
       });
 
       setItems(sorted);
@@ -164,8 +185,6 @@ const DesafiosView: React.FC<{
     void cargarParejas();
   }, []);
 
-  // ✅ Abrir desafío desde notificación:
-  // - si no está en items, lo buscamos por ID (GET /desafios/{id}) y abrimos igual
   useEffect(() => {
     if (!openDesafioId) return;
     if (openHandledRef.current === openDesafioId) return;
@@ -178,17 +197,13 @@ const DesafiosView: React.FC<{
       return;
     }
 
-    // si todavía está cargando lista, esperamos
     if (loading) return;
 
-    // ✅ Ya cargó lista y no apareció: fetch por ID
     (async () => {
       try {
         openHandledRef.current = openDesafioId;
-
         const d = await getDesafioById(openDesafioId);
 
-        // opcional: lo “inyectamos” arriba en items para que quede visible
         setItems((prev) => {
           const exists = prev.some((x) => x.id === d.id);
           return exists ? prev : [d, ...prev];
@@ -231,7 +246,6 @@ const DesafiosView: React.FC<{
     return `${d.retadora_pareja_id} vs ${d.retada_pareja_id}`;
   };
 
-  // ✅ Nuevo: etiquetas por DÚO para cualquier id
   const labelPareja = (id: number | null | undefined): string => {
     if (!id) return "—";
     return mapaParejas.get(id) ?? `Pareja ${id}`;
@@ -240,7 +254,12 @@ const DesafiosView: React.FC<{
   const handleCrearChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
-    const { name, value } = e.target;
+    const { name } = e.target;
+    let { value } = e.target;
+
+    // ✅ Hora redonda en Crear
+    if (name === "hora") value = snapToHour(value);
+
     setFormCrear((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -251,7 +270,7 @@ const DesafiosView: React.FC<{
 
     try {
       if (!formCrear.retadora_pareja_id || !formCrear.retada_pareja_id) {
-        throw new Error("Seleccioná las dos parejas.");
+        throw new Error("Seleccioná las dos duplas.");
       }
       if (!formCrear.fecha || !formCrear.hora) {
         throw new Error("Completá fecha y hora.");
@@ -314,17 +333,15 @@ const DesafiosView: React.FC<{
 
   const cerrarDetalle = () => setDesafioDetalle(null);
 
-  // ✅ NUEVO: abrir reprogramar
   const abrirReprogramar = (d: Desafio) => {
     setReprogramarTarget(d);
     setFormReprogramar({
       fecha: d.fecha,
-      hora: (d.hora || "00:00:00").slice(0, 5),
+      hora: snapToHour((d.hora || "00:00:00").slice(0, 5)),
     });
     setShowReprogramar(true);
   };
 
-  // ✅ NUEVO: submit reprogramar
   const handleSubmitReprogramar = async (e: FormEvent) => {
     e.preventDefault();
     if (!reprogramarTarget) return;
@@ -337,7 +354,6 @@ const DesafiosView: React.FC<{
         throw new Error("Completá fecha y hora.");
       }
 
-      // enviamos HH:MM: backend lo convierte a time
       await reprogramarDesafio(reprogramarTarget.id, {
         fecha: formReprogramar.fecha,
         hora: formReprogramar.hora,
@@ -381,7 +397,6 @@ const DesafiosView: React.FC<{
         )
       : null;
 
-  // ✅ Nuevo: helpers de resultado/sets (no rompen si no vienen los campos)
   const getSets = (d: Desafio) => {
     const s1r = (d as any).set1_retador;
     const s1d = (d as any).set1_desafiado;
@@ -403,24 +418,34 @@ const DesafiosView: React.FC<{
     };
   };
 
-  // ✅ Nuevo: fecha jugado
-  const getFechaJugadoLabel = (d: Desafio) => {
-    const fj = (d as any).fecha_jugado as string | undefined;
-    if (fj && fj.trim()) return formatFechaHora(fj);
+  // ✅ NUEVO: resumen “6/4 – 4/6 – 10/8”
+  const getResultadoResumen = (d: Desafio): string | null => {
+    const sets = getSets(d);
+    if (!sets) return null;
 
-    // fallback: si no existe, mostramos la programada
-    const iso = joinFechaHoraIso(d.fecha, d.hora);
-    return formatFechaHora(iso);
+    const parts: string[] = [];
+    if (sets.set1) parts.push(`${sets.set1.r}/${sets.set1.d}`);
+    if (sets.set2) parts.push(`${sets.set2.r}/${sets.set2.d}`);
+    if (sets.set3 && (sets.set3.r !== null || sets.set3.d !== null)) {
+      parts.push(`${sets.set3.r ?? "—"}/${sets.set3.d ?? "—"}`);
+    }
+
+    return parts.length ? parts.join(" – ") : null;
   };
 
-  // ✅ Nuevo: cálculo de cambio de posiciones por DÚO usando old + swap_aplicado
+  const getFechaJugadoLabelBonita = (d: Desafio) => {
+    const fj = (d as any).fecha_jugado as string | undefined;
+    const fecha = (fj && fj.trim()) ? fj : d.fecha;
+    const hora = (d.hora || "00:00:00").slice(0, 5);
+    return formatFechaJugadoBonita(fecha, hora);
+  };
+
   const getCambioPosiciones = (d: Desafio) => {
     const oldR = d.pos_retadora_old;
     const oldD = d.pos_retada_old;
 
     if (oldR == null || oldD == null) return null;
 
-    // si swap aplicado => se intercambian posiciones
     if (d.swap_aplicado) {
       return {
         retadora: { old: oldR, new: oldD },
@@ -428,7 +453,6 @@ const DesafiosView: React.FC<{
       };
     }
 
-    // si no swap, se mantienen
     return {
       retadora: { old: oldR, new: oldR },
       retada: { old: oldD, new: oldD },
@@ -447,7 +471,6 @@ const DesafiosView: React.FC<{
           </div>
 
           <div className="flex items-center gap-3">
-            {/* ✅ Botón notificaciones */}
             <button
               type="button"
               onClick={async () => {
@@ -578,7 +601,6 @@ const DesafiosView: React.FC<{
                               Rechazar
                             </button>
 
-                            {/* ✅ NUEVO: Reprogramar */}
                             <button
                               onClick={() => abrirReprogramar(d)}
                               className="rounded-full border border-indigo-300 px-3 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50"
@@ -613,7 +635,6 @@ const DesafiosView: React.FC<{
                           <span className="text-[11px] text-emerald-700">Partido jugado</span>
                         )}
 
-                        {/* ✅ trae detalle completo */}
                         <button
                           onClick={async () => {
                             setDesafioDetalle(d);
@@ -637,7 +658,7 @@ const DesafiosView: React.FC<{
         </section>
       </div>
 
-      {/* ✅ Modal REPROGRAMAR */}
+      {/* Modal REPROGRAMAR */}
       {showReprogramar && reprogramarTarget && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
@@ -673,8 +694,11 @@ const DesafiosView: React.FC<{
                   <label className="block text-xs font-medium text-slate-600 mb-1">Hora</label>
                   <input
                     type="time"
+                    step={3600}
                     value={formReprogramar.hora}
-                    onChange={(e) => setFormReprogramar((p) => ({ ...p, hora: e.target.value }))}
+                    onChange={(e) =>
+                      setFormReprogramar((p) => ({ ...p, hora: snapToHour(e.target.value) }))
+                    }
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                     required
                   />
@@ -693,17 +717,16 @@ const DesafiosView: React.FC<{
         </div>
       )}
 
-      {/* ✅ Modal DETALLE (arreglado tamaño + footer fijo + Retador/Desafiado + Sets con nombres) */}
+      {/* Modal DETALLE (Ganador verde + Resultado resumen + sin “estado/ultima actualización”) */}
       {desafioDetalle && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-3">
           <div className="w-full max-w-lg max-h-[92vh] rounded-2xl bg-white shadow-xl flex flex-col overflow-hidden">
-            {/* Header */}
             <div className="px-6 py-4 border-b border-slate-100 bg-white">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-lg font-semibold">Detalle del partido</h3>
                   <p className="text-xs text-slate-500 mt-1">
-                    Jugado: {getFechaJugadoLabel(desafioDetalle)}
+                    {getFechaJugadoLabelBonita(desafioDetalle)}
                   </p>
                 </div>
 
@@ -722,48 +745,49 @@ const DesafiosView: React.FC<{
               </div>
             </div>
 
-            {/* Body (scroll) */}
             <div className="px-6 py-4 overflow-y-auto">
-              {/* Equipos + ganador */}
-              <div className="space-y-2 mb-4">
-                {desafioDetalle.estado === "Jugado" && desafioDetalle.ganador_pareja_id ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">🏆</span>
+              {/* Ganador + resumen top */}
+              {desafioDetalle.estado === "Jugado" && desafioDetalle.ganador_pareja_id ? (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 mb-4">
+                  <p className="text-xs font-semibold text-emerald-800">🏆 Ganador</p>
+                  <p className="text-lg font-bold text-emerald-800">
+                    {labelPareja(desafioDetalle.ganador_pareja_id)}
+                  </p>
+
+                  <div className="mt-2 text-[12px] text-emerald-900 space-y-1">
                     <div>
-                      <p className="text-xs text-slate-500 font-medium">Ganador</p>
-                      <p className="text-lg font-semibold text-emerald-700">
-                        {labelPareja(desafioDetalle.ganador_pareja_id)}
-                      </p>
+                      <span className="font-semibold">Resultado:</span>{" "}
+                      {getResultadoResumen(desafioDetalle) ?? "—"}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Fecha que se jugó:</span>{" "}
+                      {getFechaJugadoLabelBonita(desafioDetalle)}
                     </div>
                   </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">🎾</span>
-                    <div>
-                      <p className="text-xs text-slate-500 font-medium">Desafío</p>
-                      <p className="text-[13px] font-semibold">
-                        {construirTituloDesafio(desafioDetalle)}
-                      </p>
-                    </div>
-                  </div>
-                )}
+                </div>
+              ) : (
+                <div className="mb-4">
+                  <p className="text-[13px] font-semibold">
+                    {construirTituloDesafio(desafioDetalle)}
+                  </p>
+                </div>
+              )}
 
-                {/* ✅ Retador / Desafiado */}
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-slate-400">Retador</span>
-                    <span className="text-[11px] text-slate-400">Desafiado</span>
-                  </div>
+              {/* Retador / Desafiado */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 mb-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-slate-400">Retador</span>
+                  <span className="text-[11px] text-slate-400">Desafiado</span>
+                </div>
 
-                  <div className="mt-1">
-                    <p className="text-[13px] font-semibold">
-                      {labelPareja(desafioDetalle.retadora_pareja_id)}
-                    </p>
-                    <p className="text-xs text-slate-400 my-1 text-center">VS</p>
-                    <p className="text-[13px] font-semibold">
-                      {labelPareja(desafioDetalle.retada_pareja_id)}
-                    </p>
-                  </div>
+                <div className="mt-1">
+                  <p className="text-[13px] font-semibold">
+                    {labelPareja(desafioDetalle.retadora_pareja_id)}
+                  </p>
+                  <p className="text-xs text-slate-400 my-1 text-center">VS</p>
+                  <p className="text-[13px] font-semibold">
+                    {labelPareja(desafioDetalle.retada_pareja_id)}
+                  </p>
                 </div>
               </div>
 
@@ -773,65 +797,7 @@ const DesafiosView: React.FC<{
                 </div>
               )}
 
-              {/* ✅ Resultado con nombres por set */}
-              <div className="mb-4">
-                <p className="text-[13px] font-semibold mb-2">Resultado</p>
-
-                {(() => {
-                  const sets = getSets(desafioDetalle);
-                  if (!sets) {
-                    return (
-                      <p className="text-xs text-slate-400">
-                        Resultado no disponible (sets no presentes en el payload).
-                      </p>
-                    );
-                  }
-
-                  const retador = labelPareja(desafioDetalle.retadora_pareja_id);
-                  const desafiado = labelPareja(desafioDetalle.retada_pareja_id);
-
-                  const cards: Array<{ title: string; r: any; d: any }> = [];
-                  if (sets.set1) cards.push({ title: "Set 1", r: sets.set1.r, d: sets.set1.d });
-                  if (sets.set2) cards.push({ title: "Set 2", r: sets.set2.r, d: sets.set2.d });
-
-                  if (sets.set3) {
-                    const r = sets.set3.r;
-                    const d = sets.set3.d;
-                    const has = r !== null || d !== null;
-                    if (has) cards.push({ title: "Super TB", r, d });
-                  }
-
-                  return (
-                    <div className="space-y-3">
-                      {cards.map((c) => (
-                        <div
-                          key={c.title}
-                          className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
-                        >
-                          <div className="flex items-center justify-between">
-                            <p className="text-[12px] font-semibold text-slate-700">{c.title}</p>
-                            <p className="text-[11px] text-slate-400">Retador vs Desafiado</p>
-                          </div>
-
-                          <div className="mt-2 space-y-2 text-[12px]">
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="text-slate-600 truncate">{retador}</span>
-                              <span className="font-semibold text-slate-900">{c.r ?? "—"}</span>
-                            </div>
-
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="text-slate-600 truncate">{desafiado}</span>
-                              <span className="font-semibold text-slate-900">{c.d ?? "—"}</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Cambio de posiciones */}
+              {/* Cambio de posiciones (se mantiene) */}
               <div className="mb-4">
                 <p className="text-[13px] font-semibold mb-2">Cambio de posiciones</p>
 
@@ -873,43 +839,12 @@ const DesafiosView: React.FC<{
                           #{cambio.retada.old} {b.icon} #{cambio.retada.new}
                         </span>
                       </div>
-
-                      <p className="text-[11px] text-slate-400">
-                        Swap aplicado: {desafioDetalle.swap_aplicado ? "Sí" : "No"} · Ranking aplicado:{" "}
-                        {desafioDetalle.ranking_aplicado ? "Sí" : "No"}
-                      </p>
                     </div>
                   );
                 })()}
               </div>
-
-              {/* Estado */}
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 mb-4">
-                <p className="text-[12px] font-semibold text-slate-700 mb-2">Estado del desafío</p>
-                <div className="space-y-1 text-[12px] text-slate-700">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Estado:</span>
-                    <span className="font-semibold">{desafioDetalle.estado}</span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Ganador (pareja):</span>
-                    <span className="font-semibold">
-                      {desafioDetalle.ganador_pareja_id
-                        ? labelPareja(desafioDetalle.ganador_pareja_id)
-                        : "—"}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Última actualización:</span>
-                    <span className="font-semibold">{formatFechaHora(desafioDetalle.updated_at)}</span>
-                  </div>
-                </div>
-              </div>
             </div>
 
-            {/* Footer SIEMPRE visible */}
             <div className="px-6 py-4 border-t border-slate-100 bg-white">
               <div className="flex flex-wrap gap-2 justify-end">
                 {desafioDetalle.estado === "Pendiente" && (
@@ -934,7 +869,6 @@ const DesafiosView: React.FC<{
                       Rechazar
                     </button>
 
-                    {/* ✅ NUEVO: Reprogramar también desde detalle */}
                     <button
                       onClick={() => {
                         abrirReprogramar(desafioDetalle);
@@ -989,7 +923,7 @@ const DesafiosView: React.FC<{
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold"></h3>
+              <h3 className="text-base font-semibold">⚔️ Nuevo desafío</h3>
               <button
                 type="button"
                 onClick={() => !creating && setShowCrear(false)}
@@ -1020,7 +954,7 @@ const DesafiosView: React.FC<{
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Pareja retadora
+                    Dupla retadora
                   </label>
                   <select
                     name="retadora_pareja_id"
@@ -1040,7 +974,7 @@ const DesafiosView: React.FC<{
 
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Pareja retada
+                    Dupla desafiada
                   </label>
                   <select
                     name="retada_pareja_id"
@@ -1075,10 +1009,11 @@ const DesafiosView: React.FC<{
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Hora
+                    Hora (solo horas redondas)
                   </label>
                   <input
                     type="time"
+                    step={3600}
                     name="hora"
                     value={formCrear.hora}
                     onChange={handleCrearChange}
@@ -1125,19 +1060,16 @@ const DesafiosView: React.FC<{
   );
 };
 
-// -------------------- APP (Login + Tabs) --------------------
 const App: React.FC = () => {
   const [isLogged, setIsLogged] = useState<boolean>(() => !!localStorage.getItem("token"));
   const [activeTab, setActiveTab] = useState<TabId>("desafiosMasculinos");
   const [openDesafioId, setOpenDesafioId] = useState<number | null>(null);
 
-  // ✅ NUEVO: ranking menu/detalle + filtro seleccionado
   const [rankingScreen, setRankingScreen] = useState<"menu" | "detalle">("menu");
   const [rankingFilter, setRankingFilter] = useState<{ genero: "M" | "F"; grupo: "A" | "B" | "C" }>(
-    { genero: "M", grupo: "B" } // tu estado actual: Masculino B
+    { genero: "M", grupo: "B" }
   );
 
-  // ✅ NUEVO: estado del toast para foreground
   const [fgToast, setFgToast] = useState<{ open: boolean; title: string; body: string; url: string }>(
     {
       open: false,
@@ -1167,7 +1099,6 @@ const App: React.FC = () => {
     listenForegroundPush();
   }, []);
 
-  // ✅ NUEVO: conectamos el callback del push.ts para que muestre toast adentro
   useEffect(() => {
     setOnForegroundToast((info) => {
       setFgToast({ open: true, ...info });
@@ -1177,7 +1108,6 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // ✅ si ya está logueado y el permiso ya está granted, auto registrar
     if (!isLogged) return;
     void tryAutoRegisterPush();
   }, [isLogged]);
@@ -1222,7 +1152,6 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-100">
-      {/* ✅ NUEVO: toast foreground */}
       <ForegroundToast
         open={fgToast.open}
         title={fgToast.title}
@@ -1295,7 +1224,7 @@ const App: React.FC = () => {
             type="button"
             onClick={() => {
               setActiveTab("ranking");
-              setRankingScreen("menu"); // ✅ NUEVO: al entrar al tab, siempre abrimos menú
+              setRankingScreen("menu");
             }}
             className={`flex-1 py-2.5 flex flex-col items-center justify-center text-[11px] ${
               activeTab === "ranking" ? "text-sky-600" : "text-slate-400"
