@@ -40,6 +40,24 @@ function formatFecha(iso: string): string {
     return iso;
   }
 }
+const getFechaJugadoLabel = (d: Desafio) => {
+  const fj = (d as any).fecha_jugado as string | undefined;
+  
+
+  // Si backend manda fecha_jugado
+  if (fj && fj.trim()) {
+    // Si ya viene ISO (con hora), lo formateamos directo
+    if (fj.includes("T")) return formatFechaHora(fj);
+
+    // Si viene solo "YYYY-MM-DD", lo unimos con hora 00:00
+    return formatFechaHora(joinFechaHoraIso(fj, "00:00:00"));
+  }
+
+  // Fallback: fecha/hora programada del desafío
+  const iso = joinFechaHoraIso(d.fecha, d.hora);
+  return formatFechaHora(iso);
+  
+};
 
 function formatFechaHora(iso: string): string {
   try {
@@ -726,8 +744,9 @@ const DesafiosView: React.FC<{
                 <div>
                   <h3 className="text-lg font-semibold">Detalle del partido</h3>
                   <p className="text-xs text-slate-500 mt-1">
-                    {getFechaJugadoLabelBonita(desafioDetalle)}
-                  </p>
+                   Jugado: {getFechaJugadoLabel(desafioDetalle)}
+                    </p>
+
                 </div>
 
                 <button
