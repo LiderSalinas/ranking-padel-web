@@ -1125,10 +1125,6 @@ const App: React.FC = () => {
     }
   );
 
-  // âœ… NUEVO: Splash auto-hide (ajustÃ¡ el tiempo si querÃ©s)
-  useEffect(() => {
-  // âœ… NUEVO: evita scroll mientras estÃ¡ el splash (sÃºper importante para â€œpantalla completaâ€)
-  useEffect(() => {
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
     const v = sp.get("open_desafio");
