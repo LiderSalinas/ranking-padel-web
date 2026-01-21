@@ -1,33 +1,44 @@
 // src/App.tsx
-import React, { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 
 import type { Desafio } from "./types/desafios";
 import type { ParejaDesafiable } from "./types/parejas";
 
 import {
   getMisProximosDesafios,
-  getDesafioById, // ✅ nuevo
+  getDesafioById,
   crearDesafio,
   aceptarDesafio,
   rechazarDesafio,
-  reprogramarDesafio, // ✅ NUEVO
+  reprogramarDesafio,
 } from "./services/desafio";
 import { getParejasDesafiables } from "./services/parejas";
 import Login from "./views/Auth/Login";
 import { logout } from "./services/auth";
 import CargarResultado from "./CargarResultado";
 import RankingView from "./views/Ranking";
-import RankingMenu from "./views/RankingMenu"; // ✅ NUEVO (MENÚ)
+import RankingMenu from "./views/RankingMenu";
 import JugadoresView from "./views/Jugadores";
 
 import {
   activarNotificacionesYGuardar,
   listenForegroundPush,
   tryAutoRegisterPush,
-  setOnForegroundToast, // ✅ NUEVO
+  setOnForegroundToast,
 } from "./push";
 
-import ForegroundToast from "./components/ForegroundToast"; // ✅ NUEVO
+import ForegroundToast from "./components/ForegroundToast";
+
+// ✅ NUEVO: Splash fullscreen
+import SplashScreen from "./components/SplashScreen";
+
 
 // Helper chiquito para mostrar 1/12, etc.
 function formatFecha(iso: string): string {
@@ -58,7 +69,6 @@ function formatFechaHora(iso: string): string {
 
 // ✅ Nuevo: arma un ISO a partir de fecha "YYYY-MM-DD" + hora "HH:MM:SS"
 function joinFechaHoraIso(fecha: string, hora: string): string {
-  // ojo: sin timezone; igual sirve para mostrar algo coherente
   const h = (hora || "00:00:00").slice(0, 8);
   return `${fecha}T${h}`;
 }
@@ -105,14 +115,13 @@ const DesafiosView: React.FC<{
     observacion: "",
   });
 
-  // ✅ NUEVO: reprogramar
+  // ✅ reprogramar
   const [showReprogramar, setShowReprogramar] = useState(false);
   const [reprogramando, setReprogramando] = useState(false);
   const [reprogramarTarget, setReprogramarTarget] = useState<Desafio | null>(null);
   const [formReprogramar, setFormReprogramar] = useState({ fecha: "", hora: "" });
 
   const [desafioSeleccionado, setDesafioSeleccionado] = useState<Desafio | null>(null);
-
   const [desafioDetalle, setDesafioDetalle] = useState<Desafio | null>(null);
   const openHandledRef = useRef<number | null>(null);
 
@@ -123,7 +132,6 @@ const DesafiosView: React.FC<{
 
       const data = await getMisProximosDesafios();
 
-      // ✅ NUEVO: Orden visual -> Pendiente primero, luego Aceptado, luego Jugado/Rechazado
       const order: Record<string, number> = {
         Pendiente: 0,
         Aceptado: 1,
@@ -164,8 +172,7 @@ const DesafiosView: React.FC<{
     void cargarParejas();
   }, []);
 
-  // ✅ Abrir desafío desde notificación:
-  // - si no está en items, lo buscamos por ID (GET /desafios/{id}) y abrimos igual
+  // ✅ Abrir desafío desde notificación
   useEffect(() => {
     if (!openDesafioId) return;
     if (openHandledRef.current === openDesafioId) return;
@@ -178,17 +185,14 @@ const DesafiosView: React.FC<{
       return;
     }
 
-    // si todavía está cargando lista, esperamos
     if (loading) return;
 
-    // ✅ Ya cargó lista y no apareció: fetch por ID
     (async () => {
       try {
         openHandledRef.current = openDesafioId;
 
         const d = await getDesafioById(openDesafioId);
 
-        // opcional: lo “inyectamos” arriba en items para que quede visible
         setItems((prev) => {
           const exists = prev.some((x) => x.id === d.id);
           return exists ? prev : [d, ...prev];
@@ -231,7 +235,7 @@ const DesafiosView: React.FC<{
     return `${d.retadora_pareja_id} vs ${d.retada_pareja_id}`;
   };
 
-  // ✅ Nuevo: etiquetas por DÚO para cualquier id
+  // ✅ etiquetas por DÚO
   const labelPareja = (id: number | null | undefined): string => {
     if (!id) return "—";
     return mapaParejas.get(id) ?? `Pareja ${id}`;
@@ -314,7 +318,7 @@ const DesafiosView: React.FC<{
 
   const cerrarDetalle = () => setDesafioDetalle(null);
 
-  // ✅ NUEVO: abrir reprogramar
+  // ✅ abrir reprogramar
   const abrirReprogramar = (d: Desafio) => {
     setReprogramarTarget(d);
     setFormReprogramar({
@@ -324,7 +328,7 @@ const DesafiosView: React.FC<{
     setShowReprogramar(true);
   };
 
-  // ✅ NUEVO: submit reprogramar
+  // ✅ submit reprogramar
   const handleSubmitReprogramar = async (e: FormEvent) => {
     e.preventDefault();
     if (!reprogramarTarget) return;
@@ -337,7 +341,6 @@ const DesafiosView: React.FC<{
         throw new Error("Completá fecha y hora.");
       }
 
-      // enviamos HH:MM: backend lo convierte a time
       await reprogramarDesafio(reprogramarTarget.id, {
         fecha: formReprogramar.fecha,
         hora: formReprogramar.hora,
@@ -381,7 +384,6 @@ const DesafiosView: React.FC<{
         )
       : null;
 
-  // ✅ Nuevo: helpers de resultado/sets (no rompen si no vienen los campos)
   const getSets = (d: Desafio) => {
     const s1r = (d as any).set1_retador;
     const s1d = (d as any).set1_desafiado;
@@ -403,24 +405,20 @@ const DesafiosView: React.FC<{
     };
   };
 
-  // ✅ Nuevo: fecha jugado
   const getFechaJugadoLabel = (d: Desafio) => {
     const fj = (d as any).fecha_jugado as string | undefined;
     if (fj && fj.trim()) return formatFechaHora(fj);
 
-    // fallback: si no existe, mostramos la programada
     const iso = joinFechaHoraIso(d.fecha, d.hora);
     return formatFechaHora(iso);
   };
 
-  // ✅ Nuevo: cálculo de cambio de posiciones por DÚO usando old + swap_aplicado
   const getCambioPosiciones = (d: Desafio) => {
     const oldR = d.pos_retadora_old;
     const oldD = d.pos_retada_old;
 
     if (oldR == null || oldD == null) return null;
 
-    // si swap aplicado => se intercambian posiciones
     if (d.swap_aplicado) {
       return {
         retadora: { old: oldR, new: oldD },
@@ -428,7 +426,6 @@ const DesafiosView: React.FC<{
       };
     }
 
-    // si no swap, se mantienen
     return {
       retadora: { old: oldR, new: oldR },
       retada: { old: oldD, new: oldD },
@@ -447,7 +444,6 @@ const DesafiosView: React.FC<{
           </div>
 
           <div className="flex items-center gap-3">
-            {/* ✅ Botón notificaciones */}
             <button
               type="button"
               onClick={async () => {
@@ -460,7 +456,10 @@ const DesafiosView: React.FC<{
                   }
 
                   if (r.reason === "unsupported") {
-                    alert(r.message || "Este navegador no soporta notificaciones. Abrí en Safari/Chrome.");
+                    alert(
+                      r.message ||
+                        "Este navegador no soporta notificaciones. Abrí en Safari/Chrome."
+                    );
                     return;
                   }
 
@@ -524,9 +523,7 @@ const DesafiosView: React.FC<{
           <div className="mt-6 space-y-3">
             {loading && <p className="text-xs text-slate-400">Cargando desafíos…</p>}
 
-            {!loading && error && (
-              <p className="text-sm text-red-500 text-center">{error}</p>
-            )}
+            {!loading && error && <p className="text-sm text-red-500 text-center">{error}</p>}
 
             {!loading && !error && items.length === 0 && (
               <p className="text-sm text-slate-400 text-center">No tenés desafíos próximos.</p>
@@ -578,7 +575,6 @@ const DesafiosView: React.FC<{
                               Rechazar
                             </button>
 
-                            {/* ✅ NUEVO: Reprogramar */}
                             <button
                               onClick={() => abrirReprogramar(d)}
                               className="rounded-full border border-indigo-300 px-3 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50"
@@ -613,7 +609,6 @@ const DesafiosView: React.FC<{
                           <span className="text-[11px] text-emerald-700">Partido jugado</span>
                         )}
 
-                        {/* ✅ trae detalle completo */}
                         <button
                           onClick={async () => {
                             setDesafioDetalle(d);
@@ -693,11 +688,10 @@ const DesafiosView: React.FC<{
         </div>
       )}
 
-      {/* ✅ Modal DETALLE (arreglado tamaño + footer fijo + Retador/Desafiado + Sets con nombres) */}
+      {/* ✅ Modal DETALLE */}
       {desafioDetalle && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-3">
           <div className="w-full max-w-lg max-h-[92vh] rounded-2xl bg-white shadow-xl flex flex-col overflow-hidden">
-            {/* Header */}
             <div className="px-6 py-4 border-b border-slate-100 bg-white">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -722,9 +716,7 @@ const DesafiosView: React.FC<{
               </div>
             </div>
 
-            {/* Body (scroll) */}
             <div className="px-6 py-4 overflow-y-auto">
-              {/* Equipos + ganador */}
               <div className="space-y-2 mb-4">
                 {desafioDetalle.estado === "Jugado" && desafioDetalle.ganador_pareja_id ? (
                   <div className="flex items-center gap-2">
@@ -748,7 +740,6 @@ const DesafiosView: React.FC<{
                   </div>
                 )}
 
-                {/* ✅ Retador / Desafiado */}
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] text-slate-400">Retador</span>
@@ -773,7 +764,6 @@ const DesafiosView: React.FC<{
                 </div>
               )}
 
-              {/* ✅ Resultado con nombres por set */}
               <div className="mb-4">
                 <p className="text-[13px] font-semibold mb-2">Resultado</p>
 
@@ -831,7 +821,6 @@ const DesafiosView: React.FC<{
                 })()}
               </div>
 
-              {/* Cambio de posiciones */}
               <div className="mb-4">
                 <p className="text-[13px] font-semibold mb-2">Cambio de posiciones</p>
 
@@ -883,7 +872,6 @@ const DesafiosView: React.FC<{
                 })()}
               </div>
 
-              {/* Estado */}
               <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 mb-4">
                 <p className="text-[12px] font-semibold text-slate-700 mb-2">Estado del desafío</p>
                 <div className="space-y-1 text-[12px] text-slate-700">
@@ -909,7 +897,6 @@ const DesafiosView: React.FC<{
               </div>
             </div>
 
-            {/* Footer SIEMPRE visible */}
             <div className="px-6 py-4 border-t border-slate-100 bg-white">
               <div className="flex flex-wrap gap-2 justify-end">
                 {desafioDetalle.estado === "Pendiente" && (
@@ -934,7 +921,6 @@ const DesafiosView: React.FC<{
                       Rechazar
                     </button>
 
-                    {/* ✅ NUEVO: Reprogramar también desde detalle */}
                     <button
                       onClick={() => {
                         abrirReprogramar(desafioDetalle);
@@ -989,7 +975,7 @@ const DesafiosView: React.FC<{
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold"></h3>
+              <h3 className="text-base font-semibold">Nuevo desafío</h3>
               <button
                 type="button"
                 onClick={() => !creating && setShowCrear(false)}
@@ -1061,9 +1047,7 @@ const DesafiosView: React.FC<{
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Fecha
-                  </label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Fecha</label>
                   <input
                     type="date"
                     name="fecha"
@@ -1074,9 +1058,7 @@ const DesafiosView: React.FC<{
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Hora
-                  </label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Hora</label>
                   <input
                     type="time"
                     name="hora"
@@ -1089,9 +1071,7 @@ const DesafiosView: React.FC<{
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
-                  Observación
-                </label>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Observación</label>
                 <textarea
                   name="observacion"
                   value={formCrear.observacion}
@@ -1131,13 +1111,16 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>("desafiosMasculinos");
   const [openDesafioId, setOpenDesafioId] = useState<number | null>(null);
 
-  // ✅ NUEVO: ranking menu/detalle + filtro seleccionado
+  // ✅ NUEVO: Splash state
+  const [showSplash, setShowSplash] = useState(true);
+
+  // ✅ ranking menu/detalle + filtro seleccionado
   const [rankingScreen, setRankingScreen] = useState<"menu" | "detalle">("menu");
   const [rankingFilter, setRankingFilter] = useState<{ genero: "M" | "F"; grupo: "A" | "B" | "C" }>(
-    { genero: "M", grupo: "B" } // tu estado actual: Masculino B
+    { genero: "M", grupo: "B" }
   );
 
-  // ✅ NUEVO: estado del toast para foreground
+  // ✅ toast para foreground
   const [fgToast, setFgToast] = useState<{ open: boolean; title: string; body: string; url: string }>(
     {
       open: false,
@@ -1146,6 +1129,22 @@ const App: React.FC = () => {
       url: "/",
     }
   );
+
+  // ✅ NUEVO: Splash auto-hide (ajustá el tiempo si querés)
+  useEffect(() => {
+    const t = window.setTimeout(() => setShowSplash(false), 1200);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  // ✅ NUEVO: evita scroll mientras está el splash (súper importante para “pantalla completa”)
+  useEffect(() => {
+    if (!showSplash) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [showSplash]);
 
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
@@ -1159,7 +1158,9 @@ const App: React.FC = () => {
     setOpenDesafioId(n);
 
     sp.delete("open_desafio");
-    const newUrl = `${window.location.pathname}${sp.toString() ? `?${sp.toString()}` : ""}${window.location.hash || ""}`;
+    const newUrl = `${window.location.pathname}${
+      sp.toString() ? `?${sp.toString()}` : ""
+    }${window.location.hash || ""}`;
     window.history.replaceState({}, "", newUrl);
   }, []);
 
@@ -1167,7 +1168,6 @@ const App: React.FC = () => {
     listenForegroundPush();
   }, []);
 
-  // ✅ NUEVO: conectamos el callback del push.ts para que muestre toast adentro
   useEffect(() => {
     setOnForegroundToast((info) => {
       setFgToast({ open: true, ...info });
@@ -1177,7 +1177,6 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // ✅ si ya está logueado y el permiso ya está granted, auto registrar
     if (!isLogged) return;
     void tryAutoRegisterPush();
   }, [isLogged]);
@@ -1210,126 +1209,128 @@ const App: React.FC = () => {
     setIsLogged(false);
   };
 
-  if (!isLogged) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
-        <div className="w-full max-w-sm">
-          <Login onLoggedIn={handleLoggedIn} />
-        </div>
-      </div>
-    );
-  }
-
+  // ✅ NUEVO: Splash va arriba de todo (antes de login o app)
+  // Tip: si querés que NO se pueda saltar, sacá onSkip.
   return (
     <div className="min-h-screen flex flex-col bg-slate-100">
-      {/* ✅ NUEVO: toast foreground */}
-      <ForegroundToast
-        open={fgToast.open}
-        title={fgToast.title}
-        body={fgToast.body}
-        onClose={() => setFgToast((t) => ({ ...t, open: false }))}
-        onClick={() => {
-          try {
-            window.focus();
-            window.location.assign(fgToast.url || "/");
-          } catch {
-            window.open(fgToast.url || "/", "_blank");
-          } finally {
-            setFgToast((t) => ({ ...t, open: false }));
-          }
-        }}
-      />
+      {showSplash && <SplashScreen onSkip={() => setShowSplash(false)} />}
 
-      <main className="flex-1 pb-16">
-        {activeTab === "desafiosMasculinos" && (
-          <DesafiosView
-            onLogout={handleLogout}
-            headerTitle={header.title}
-            headerSubtitle={header.subtitle}
-            openDesafioId={openDesafioId}
-            clearOpenDesafio={() => setOpenDesafioId(null)}
-          />
-        )}
-
-        {activeTab === "ranking" && (
-          rankingScreen === "menu" ? (
-            <RankingMenu
-              onSelect={(f) => {
-                setRankingFilter(f);
-                setRankingScreen("detalle");
-              }}
-            />
-          ) : (
-            <RankingView
-              grupo={rankingFilter.grupo}
-              genero={rankingFilter.genero}
-              onBack={() => setRankingScreen("menu")}
-            />
-          )
-        )}
-
-        {activeTab === "jugadores" && <JugadoresView onLogout={handleLogout} />}
-
-        {activeTab === "desafiosFemeninos" && (
-          <div className="min-h-[calc(100vh-120px)] flex items-center justify-center text-xs text-slate-400">
-            Desafíos femeninos A/B/C (pendiente).
+      {!isLogged ? (
+        <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
+          <div className="w-full max-w-sm">
+            <Login onLoggedIn={handleLoggedIn} />
           </div>
-        )}
-      </main>
-
-      <nav className="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-slate-200">
-        <div className="max-w-4xl mx-auto flex">
-          <button
-            type="button"
-            onClick={() => setActiveTab("desafiosMasculinos")}
-            className={`flex-1 py-2.5 flex flex-col items-center justify-center text-[11px] ${
-              activeTab === "desafiosMasculinos" ? "text-sky-600" : "text-slate-400"
-            }`}
-          >
-            <span className="text-lg">🎾</span>
-            <span>Desafíos Masc.</span>
-            <span className="text-[10px]">A | B | C</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("ranking");
-              setRankingScreen("menu"); // ✅ NUEVO: al entrar al tab, siempre abrimos menú
-            }}
-            className={`flex-1 py-2.5 flex flex-col items-center justify-center text-[11px] ${
-              activeTab === "ranking" ? "text-sky-600" : "text-slate-400"
-            }`}
-          >
-            <span className="text-lg">📊</span>
-            <span>Ranking</span>
-            <span className="text-[10px]">General</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("jugadores")}
-            className={`flex-1 py-2.5 flex flex-col items-center justify-center text-[11px] ${
-              activeTab === "jugadores" ? "text-sky-600" : "text-slate-400"
-            }`}
-          >
-            <span className="text-lg">👥</span>
-            <span>Jugadores</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("desafiosFemeninos")}
-            className={`flex-1 py-2.5 flex flex-col items-center justify-center text-[11px] ${
-              activeTab === "desafiosFemeninos" ? "text-sky-600" : "text-slate-400"
-            }`}
-          >
-            <span className="text-lg">🎾</span>
-            <span>Desafíos Fem.</span>
-            <span className="text-[10px]">A | B | C</span>
-          </button>
         </div>
-      </nav>
+      ) : (
+        <>
+          <ForegroundToast
+            open={fgToast.open}
+            title={fgToast.title}
+            body={fgToast.body}
+            onClose={() => setFgToast((t) => ({ ...t, open: false }))}
+            onClick={() => {
+              try {
+                window.focus();
+                window.location.assign(fgToast.url || "/");
+              } catch {
+                window.open(fgToast.url || "/", "_blank");
+              } finally {
+                setFgToast((t) => ({ ...t, open: false }));
+              }
+            }}
+          />
+
+          <main className="flex-1 pb-16">
+            {activeTab === "desafiosMasculinos" && (
+              <DesafiosView
+                onLogout={handleLogout}
+                headerTitle={header.title}
+                headerSubtitle={header.subtitle}
+                openDesafioId={openDesafioId}
+                clearOpenDesafio={() => setOpenDesafioId(null)}
+              />
+            )}
+
+            {activeTab === "ranking" &&
+              (rankingScreen === "menu" ? (
+                <RankingMenu
+                  onSelect={(f) => {
+                    setRankingFilter(f);
+                    setRankingScreen("detalle");
+                  }}
+                />
+              ) : (
+                <RankingView
+                  grupo={rankingFilter.grupo}
+                  genero={rankingFilter.genero}
+                  onBack={() => setRankingScreen("menu")}
+                />
+              ))}
+
+            {activeTab === "jugadores" && <JugadoresView onLogout={handleLogout} />}
+
+            {activeTab === "desafiosFemeninos" && (
+              <div className="min-h-[calc(100vh-120px)] flex items-center justify-center text-xs text-slate-400">
+                Desafíos femeninos A/B/C (pendiente).
+              </div>
+            )}
+          </main>
+
+          <nav className="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-slate-200">
+            <div className="max-w-4xl mx-auto flex">
+              <button
+                type="button"
+                onClick={() => setActiveTab("desafiosMasculinos")}
+                className={`flex-1 py-2.5 flex flex-col items-center justify-center text-[11px] ${
+                  activeTab === "desafiosMasculinos" ? "text-sky-600" : "text-slate-400"
+                }`}
+              >
+                <span className="text-lg">🎾</span>
+                <span>Desafíos Masc.</span>
+                <span className="text-[10px]">A | B | C</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("ranking");
+                  setRankingScreen("menu");
+                }}
+                className={`flex-1 py-2.5 flex flex-col items-center justify-center text-[11px] ${
+                  activeTab === "ranking" ? "text-sky-600" : "text-slate-400"
+                }`}
+              >
+                <span className="text-lg">📊</span>
+                <span>Ranking</span>
+                <span className="text-[10px]">General</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab("jugadores")}
+                className={`flex-1 py-2.5 flex flex-col items-center justify-center text-[11px] ${
+                  activeTab === "jugadores" ? "text-sky-600" : "text-slate-400"
+                }`}
+              >
+                <span className="text-lg">👥</span>
+                <span>Jugadores</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab("desafiosFemeninos")}
+                className={`flex-1 py-2.5 flex flex-col items-center justify-center text-[11px] ${
+                  activeTab === "desafiosFemeninos" ? "text-sky-600" : "text-slate-400"
+                }`}
+              >
+                <span className="text-lg">🎾</span>
+                <span>Desafíos Fem.</span>
+                <span className="text-[10px]">A | B | C</span>
+              </button>
+            </div>
+          </nav>
+        </>
+      )}
     </div>
   );
 };

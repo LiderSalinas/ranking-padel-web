@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
 
-    <!-- Responsive -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- ✅ Responsive + fullscreen real en iOS -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
     <!-- ✅ PWA -->
     <link rel="manifest" href="/manifest.webmanifest" />
@@ -28,8 +28,16 @@
 
     <title>Ranking Padel Oficial</title>
 
-    <!-- ✅ SPLASH FULLSCREEN (fake splash) -->
+    <!-- ✅ SPLASH FULLSCREEN (HTML splash antes de React) -->
     <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden; /* ✅ evita scroll durante splash */
+        background: #0f4b8c;
+      }
+
       #splash-screen {
         position: fixed;
         inset: 0;
@@ -43,11 +51,11 @@
       #splash-screen img {
         width: 100vw;
         height: 100vh;
-        object-fit: cover; /* ✅ imagen completa */
+        object-fit: cover; /* ✅ fullscreen real */
         display: block;
       }
 
-      /* cuando se oculta */
+      /* ✅ cuando se oculta (main.tsx lo activa) */
       #splash-screen.hidden {
         opacity: 0;
         pointer-events: none;
@@ -59,6 +67,7 @@
   <body>
     <!-- ✅ splash antes de React -->
     <div id="splash-screen">
+      <!-- ✅ La imagen debe estar en: public/splash.jpg -->
       <img src="/splash.jpg" alt="Ranking Padel Oficial" />
     </div>
 
