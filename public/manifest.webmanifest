@@ -1,8 +1,8 @@
-{
+﻿{
   "name": "Ranking Padel Oficial",
   "short_name": "Ranking Padel Oficial",
-  "description": "Ranking Pádel Oficial - desafíos, resultados y posiciones.",
-  "start_url": "/",
+  "description": "Ranking PÃ¡del Oficial - desafÃ­os, resultados y posiciones.",
+  "start_url": "/?v=20260121095831",
   "scope": "/",
   "display": "standalone",
   "background_color": "#0f4b8c",
@@ -14,3 +14,4 @@
     { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
+

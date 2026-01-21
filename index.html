@@ -1,40 +1,40 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
 
-    <!-- ✅ Responsive + fullscreen real en iOS -->
+    <!-- âœ… Responsive + fullscreen real en iOS -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
-    <!-- ✅ PWA -->
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- âœ… PWA -->
+    <link rel="manifest" href="/manifest.webmanifest?v=20260121095831" />
     <meta name="theme-color" content="#0f4b8c" />
 
-    <!-- ✅ Fix warning (Android/Chrome) -->
+    <!-- âœ… Fix warning (Android/Chrome) -->
     <meta name="mobile-web-app-capable" content="yes" />
 
-    <!-- ✅ Nombre -->
+    <!-- âœ… Nombre -->
     <meta name="application-name" content="Ranking Padel Oficial" />
     <meta name="apple-mobile-web-app-title" content="Ranking Padel Oficial" />
 
-    <!-- ✅ Iconos -->
-    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <!-- âœ… Iconos -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png?v=20260121095831" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=20260121095831" />
 
-    <!-- ✅ iOS -->
+    <!-- âœ… iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="format-detection" content="telephone=no" />
 
     <title>Ranking Padel Oficial</title>
 
-    <!-- ✅ SPLASH FULLSCREEN (HTML splash antes de React) -->
+    <!-- âœ… SPLASH FULLSCREEN (HTML splash antes de React) -->
     <style>
       html,
       body {
         margin: 0;
         height: 100%;
-        overflow: hidden; /* ✅ evita scroll durante splash */
+        overflow: hidden; /* âœ… evita scroll durante splash */
         background: #0f4b8c;
       }
 
@@ -51,11 +51,11 @@
       #splash-screen img {
         width: 100vw;
         height: 100vh;
-        object-fit: cover; /* ✅ fullscreen real */
+        object-fit: cover; /* âœ… fullscreen real */
         display: block;
       }
 
-      /* ✅ cuando se oculta (main.tsx lo activa) */
+      /* âœ… cuando se oculta (main.tsx lo activa) */
       #splash-screen.hidden {
         opacity: 0;
         pointer-events: none;
@@ -65,9 +65,9 @@
   </head>
 
   <body>
-    <!-- ✅ splash antes de React -->
+    <!-- âœ… splash antes de React -->
     <div id="splash-screen">
-      <!-- ✅ La imagen debe estar en: public/splash.jpg -->
+      <!-- âœ… La imagen debe estar en: public/splash.jpg -->
       <img src="/splash.jpg" alt="Ranking Padel Oficial" />
     </div>
 
@@ -75,3 +75,4 @@
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
+
