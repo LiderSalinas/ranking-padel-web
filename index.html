@@ -3,9 +3,19 @@
   <head>
     <meta charset="UTF-8" />
 
+    <!-- Responsive -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
     <!-- ✅ PWA -->
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#0f4b8c" />
+
+    <!-- ✅ Fix warning (Android/Chrome) -->
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- ✅ Nombre (algunos navegadores lo usan como fallback) -->
+    <meta name="application-name" content="Ranking Padel Oficial" />
+    <meta name="apple-mobile-web-app-title" content="Ranking Padel Oficial" />
 
     <!-- ✅ Iconos propios (NO Vite) -->
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
@@ -15,8 +25,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
-    <!-- Responsive -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- ✅ iOS: evita que números se vuelvan links -->
+    <meta name="format-detection" content="telephone=no" />
 
     <title>Ranking Padel Oficial</title>
   </head>
