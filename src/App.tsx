@@ -16,6 +16,7 @@ import Login from "./views/Auth/Login";
 import { logout } from "./services/auth";
 import CargarResultado from "./CargarResultado";
 import RankingView from "./views/Ranking";
+import RankingMenu from "./views/RankingMenu"; // ✅ NUEVO (MENÚ)
 import JugadoresView from "./views/Jugadores";
 
 import {
@@ -984,6 +985,12 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>("desafiosMasculinos");
   const [openDesafioId, setOpenDesafioId] = useState<number | null>(null);
 
+  // ✅ NUEVO: ranking menu/detalle + filtro seleccionado
+  const [rankingScreen, setRankingScreen] = useState<"menu" | "detalle">("menu");
+  const [rankingFilter, setRankingFilter] = useState<{ genero: "M" | "F"; grupo: "A" | "B" | "C" }>(
+    { genero: "M", grupo: "B" } // tu estado actual: Masculino B
+  );
+
   // ✅ NUEVO: estado del toast para foreground
   const [fgToast, setFgToast] = useState<{ open: boolean; title: string; body: string; url: string }>(
     {
@@ -1098,7 +1105,22 @@ const App: React.FC = () => {
           />
         )}
 
-        {activeTab === "ranking" && <RankingView />}
+        {activeTab === "ranking" && (
+          rankingScreen === "menu" ? (
+            <RankingMenu
+              onSelect={(f) => {
+                setRankingFilter(f);
+                setRankingScreen("detalle");
+              }}
+            />
+          ) : (
+            <RankingView
+              grupo={rankingFilter.grupo}
+              genero={rankingFilter.genero}
+              onBack={() => setRankingScreen("menu")}
+            />
+          )
+        )}
 
         {activeTab === "jugadores" && <JugadoresView onLogout={handleLogout} />}
 
@@ -1125,7 +1147,10 @@ const App: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => setActiveTab("ranking")}
+            onClick={() => {
+              setActiveTab("ranking");
+              setRankingScreen("menu"); // ✅ NUEVO: al entrar al tab, siempre abrimos menú
+            }}
             className={`flex-1 py-2.5 flex flex-col items-center justify-center text-[11px] ${
               activeTab === "ranking" ? "text-sky-600" : "text-slate-400"
             }`}

@@ -1,7 +1,14 @@
 // src/views/Ranking.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { getRanking } from "../services/ranking";
 import type { RankingItem } from "../types/ranking";
+
+// ✅ NUEVO: props para modo detalle (sin romper si no se pasan)
+type Props = {
+  grupo?: "A" | "B" | "C";
+  genero?: "M" | "F"; // listo para futuro si backend expone el dato
+  onBack?: () => void;
+};
 
 // Helper para armar "G/P/R"
 function formatRecord(item: RankingItem): string {
@@ -44,7 +51,7 @@ const ChipGrupo: React.FC<{ grupo: string }> = ({ grupo }) => {
   );
 };
 
-const RankingView: React.FC = () => {
+const RankingView: React.FC<Props> = ({ grupo, genero, onBack }) => {
   const [items, setItems] = useState<RankingItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,16 +85,46 @@ const RankingView: React.FC = () => {
     void cargarRanking();
   }, []);
 
+  // ✅ NUEVO: filtrado por grupo (y genero listo para futuro)
+  const itemsFiltrados = useMemo(() => {
+    let arr = items;
+
+    if (grupo) {
+      arr = arr.filter((x) => String(x.grupo).toUpperCase() === grupo);
+    }
+
+    // genero queda listo (no se usa porque tu backend no trae campo)
+    void genero;
+
+    return arr;
+  }, [items, grupo, genero]);
+
+  // ✅ NUEVO: título dinámico según filtro
+  const titulo = grupo ? `Ranking ${grupo}` : "Ranking general";
+
   return (
     <div className="min-h-[calc(100vh-120px)] bg-slate-100 text-slate-900">
       <div className="max-w-4xl mx-auto px-4 py-6">
-        <header className="mb-4">
-          <h2 className="text-lg font-semibold text-slate-900">
-            Ranking general
-          </h2>
-          <p className="text-xs text-slate-500 mt-1">
-            Posiciones actuales por pareja, con récord y cuota. Modelo AppSheet.
-          </p>
+        <header className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">
+              {titulo}
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Posiciones actuales por pareja, con récord y cuota. Modelo AppSheet.
+            </p>
+          </div>
+
+          {/* ✅ NUEVO: botón volver al menú (si lo pasamos desde App) */}
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            >
+              ← Volver
+            </button>
+          )}
         </header>
 
         <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -99,13 +136,13 @@ const RankingView: React.FC = () => {
             <div className="p-6 text-sm text-center text-red-500">{error}</div>
           )}
 
-          {!loading && !error && items.length === 0 && (
+          {!loading && !error && itemsFiltrados.length === 0 && (
             <div className="p-6 text-sm text-center text-slate-400">
               Aún no hay posiciones cargadas.
             </div>
           )}
 
-          {!loading && !error && items.length > 0 && (
+          {!loading && !error && itemsFiltrados.length > 0 && (
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-xs">
                 <thead className="bg-slate-50 border-b border-slate-100">
@@ -132,7 +169,7 @@ const RankingView: React.FC = () => {
                 </thead>
 
                 <tbody>
-                  {items.map((it) => (
+                  {itemsFiltrados.map((it) => (
                     <tr
                       key={it.id || it.pareja_id}
                       className="border-b border-slate-50 hover:bg-slate-50/70 transition"
