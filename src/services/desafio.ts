@@ -37,6 +37,22 @@ export async function rechazarDesafio(id: number): Promise<Desafio> {
   return request<Desafio>(`/desafios/${id}/rechazar`, { method: "POST" });
 }
 
+// ✅ NUEVO: Reprogramar desafío (solo fecha y hora)
+export type ReprogramarDesafioPayload = {
+  fecha: string; // "YYYY-MM-DD"
+  hora: string;  // "HH:MM" o "HH:MM:SS"
+};
+
+export async function reprogramarDesafio(
+  id: number,
+  payload: ReprogramarDesafioPayload
+): Promise<Desafio> {
+  return request<Desafio>(`/desafios/${id}/reprogramar`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
 // --------- Cargar resultado de un desafío ---------
 export type CargarResultadoPayload = {
   desafio_id: number;
