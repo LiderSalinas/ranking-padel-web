@@ -10,6 +10,7 @@ import {
   crearDesafio,
   aceptarDesafio,
   rechazarDesafio,
+  reprogramarDesafio, // ✅ NUEVO
 } from "./services/desafio";
 import { getParejasDesafiables } from "./services/parejas";
 import Login from "./views/Auth/Login";
@@ -104,6 +105,12 @@ const DesafiosView: React.FC<{
     observacion: "",
   });
 
+  // ✅ NUEVO: reprogramar
+  const [showReprogramar, setShowReprogramar] = useState(false);
+  const [reprogramando, setReprogramando] = useState(false);
+  const [reprogramarTarget, setReprogramarTarget] = useState<Desafio | null>(null);
+  const [formReprogramar, setFormReprogramar] = useState({ fecha: "", hora: "" });
+
   const [desafioSeleccionado, setDesafioSeleccionado] = useState<Desafio | null>(null);
 
   const [desafioDetalle, setDesafioDetalle] = useState<Desafio | null>(null);
@@ -113,8 +120,28 @@ const DesafiosView: React.FC<{
     try {
       setLoading(true);
       setError(null);
+
       const data = await getMisProximosDesafios();
-      setItems(data);
+
+      // ✅ NUEVO: Orden visual -> Pendiente primero, luego Aceptado, luego Jugado/Rechazado
+      const order: Record<string, number> = {
+        Pendiente: 0,
+        Aceptado: 1,
+        Jugado: 2,
+        Rechazado: 3,
+      };
+
+      const sorted = [...data].sort((a, b) => {
+        const oa = order[a.estado] ?? 99;
+        const ob = order[b.estado] ?? 99;
+        if (oa !== ob) return oa - ob;
+
+        const da = new Date(`${a.fecha}T${(a.hora || "00:00:00").slice(0, 8)}`).getTime();
+        const db = new Date(`${b.fecha}T${(b.hora || "00:00:00").slice(0, 8)}`).getTime();
+        return da - db;
+      });
+
+      setItems(sorted);
     } catch (err: any) {
       console.error(err);
       setError(err?.message || "Error al cargar desafíos");
@@ -286,6 +313,48 @@ const DesafiosView: React.FC<{
   };
 
   const cerrarDetalle = () => setDesafioDetalle(null);
+
+  // ✅ NUEVO: abrir reprogramar
+  const abrirReprogramar = (d: Desafio) => {
+    setReprogramarTarget(d);
+    setFormReprogramar({
+      fecha: d.fecha,
+      hora: (d.hora || "00:00:00").slice(0, 5),
+    });
+    setShowReprogramar(true);
+  };
+
+  // ✅ NUEVO: submit reprogramar
+  const handleSubmitReprogramar = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!reprogramarTarget) return;
+
+    try {
+      setReprogramando(true);
+      setError(null);
+
+      if (!formReprogramar.fecha || !formReprogramar.hora) {
+        throw new Error("Completá fecha y hora.");
+      }
+
+      // enviamos HH:MM: backend lo convierte a time
+      await reprogramarDesafio(reprogramarTarget.id, {
+        fecha: formReprogramar.fecha,
+        hora: formReprogramar.hora,
+      });
+
+      setShowReprogramar(false);
+      setReprogramarTarget(null);
+
+      await cargarDesafios();
+      alert("✅ Desafío reprogramado y notificado.");
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.detail || err?.message || "No se pudo reprogramar el desafío");
+    } finally {
+      setReprogramando(false);
+    }
+  };
 
   const parejaRetadoraSeleccionada = parejas.find(
     (p) => String(p.id) === formCrear.retadora_pareja_id
@@ -501,11 +570,20 @@ const DesafiosView: React.FC<{
                             >
                               Aceptar
                             </button>
+
                             <button
                               onClick={() => handleRechazar(d.id)}
                               className="rounded-full border border-orange-300 px-3 py-1 text-xs font-medium text-orange-700 hover:bg-orange-50"
                             >
                               Rechazar
+                            </button>
+
+                            {/* ✅ NUEVO: Reprogramar */}
+                            <button
+                              onClick={() => abrirReprogramar(d)}
+                              className="rounded-full border border-indigo-300 px-3 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50"
+                            >
+                              Reprogramar
                             </button>
                           </>
                         )}
@@ -558,6 +636,62 @@ const DesafiosView: React.FC<{
           </div>
         </section>
       </div>
+
+      {/* ✅ Modal REPROGRAMAR */}
+      {showReprogramar && reprogramarTarget && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold">Reprogramar desafío</h3>
+              <button
+                type="button"
+                onClick={() => !reprogramando && setShowReprogramar(false)}
+                className="text-xs text-slate-500 hover:text-slate-700"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 mb-3">
+              Solo se puede cambiar fecha y hora (estado: Pendiente).
+            </p>
+
+            <form onSubmit={handleSubmitReprogramar} className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Fecha</label>
+                  <input
+                    type="date"
+                    value={formReprogramar.fecha}
+                    onChange={(e) => setFormReprogramar((p) => ({ ...p, fecha: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Hora</label>
+                  <input
+                    type="time"
+                    value={formReprogramar.hora}
+                    onChange={(e) => setFormReprogramar((p) => ({ ...p, hora: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                    required
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={reprogramando}
+                className="w-full mt-1 rounded-lg bg-indigo-600 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {reprogramando ? "Guardando…" : "Guardar reprogramación"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ✅ Modal DETALLE (arreglado tamaño + footer fijo + Retador/Desafiado + Sets con nombres) */}
       {desafioDetalle && (
@@ -789,6 +923,7 @@ const DesafiosView: React.FC<{
                     >
                       Aceptar
                     </button>
+
                     <button
                       onClick={async () => {
                         await handleRechazar(desafioDetalle.id);
@@ -797,6 +932,17 @@ const DesafiosView: React.FC<{
                       className="rounded-full border border-orange-300 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-50"
                     >
                       Rechazar
+                    </button>
+
+                    {/* ✅ NUEVO: Reprogramar también desde detalle */}
+                    <button
+                      onClick={() => {
+                        abrirReprogramar(desafioDetalle);
+                        cerrarDetalle();
+                      }}
+                      className="rounded-full border border-indigo-300 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50"
+                    >
+                      Reprogramar
                     </button>
                   </>
                 )}
