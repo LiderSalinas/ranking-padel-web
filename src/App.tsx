@@ -343,9 +343,13 @@ const DesafiosView: React.FC<{
     const tituloUI = construirTituloDesafio(d);
     const copia = { ...d, titulo_desafio: tituloUI };
     setDesafioSeleccionado(copia);
-  };
+     };
 
-  const cerrarDetalle = () => setDesafioDetalle(null);
+    const cerrarDetalle = () => {
+     openHandledRef.current = null;
+     setDesafioDetalle(null);
+    };
+
 
   const abrirReprogramar = (d: Desafio) => {
     setReprogramarTarget(d);
@@ -1056,6 +1060,7 @@ const App: React.FC = () => {
   );
 
   useEffect(() => {
+  const tryOpenFromUrl = () => {
     const sp = new URLSearchParams(window.location.search);
     const v = sp.get("open_desafio");
     if (!v) return;
@@ -1069,7 +1074,17 @@ const App: React.FC = () => {
     sp.delete("open_desafio");
     const newUrl = `${window.location.pathname}${sp.toString() ? `?${sp.toString()}` : ""}${window.location.hash || ""}`;
     window.history.replaceState({}, "", newUrl);
+  };
+  tryOpenFromUrl();
+  window.addEventListener("focus", tryOpenFromUrl);
+  window.addEventListener("popstate", tryOpenFromUrl);
+
+  return () => {
+    window.removeEventListener("focus", tryOpenFromUrl);
+    window.removeEventListener("popstate", tryOpenFromUrl);
+  };
   }, []);
+
 
   useEffect(() => {
     listenForegroundPush();
