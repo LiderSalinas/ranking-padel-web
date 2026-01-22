@@ -14,16 +14,27 @@ type Props = {
   parejas?: Pareja[];
 };
 
+function buildHorasRedondas(): string[] {
+  // "00:00" .. "23:00"
+  const out: string[] = [];
+  for (let h = 0; h < 24; h++) {
+    out.push(`${String(h).padStart(2, "0")}:00`);
+  }
+  return out;
+}
+
 const CrearDesafio: React.FC<Props> = ({ onClose, onCreated, parejas = [] }) => {
   const [retadoraId, setRetadoraId] = useState<string>("");
   const [retadaId, setRetadaId] = useState<string>("");
 
   const [fecha, setFecha] = useState<string>("");
-  const [hora, setHora] = useState<string>(""); // ahora se elige solo HH:00
+  const [hora, setHora] = useState<string>(""); // ahora guardamos "HH:00"
   const [observacion, setObservacion] = useState<string>("");
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const horasRedondas = useMemo(() => buildHorasRedondas(), []);
 
   // Mantengo el orden que venga
   const parejasOrdenadas = useMemo(() => parejas, [parejas]);
@@ -62,7 +73,6 @@ const CrearDesafio: React.FC<Props> = ({ onClose, onCreated, parejas = [] }) => 
       return;
     }
 
-    // Doble seguridad: aunque el combo ya filtre, no dejamos pasar iguales
     if (idR === idD) {
       setErrorMsg("La pareja retadora y la pareja retada deben ser distintas.");
       return;
@@ -74,12 +84,9 @@ const CrearDesafio: React.FC<Props> = ({ onClose, onCreated, parejas = [] }) => 
     }
 
     if (!hora) {
-      setErrorMsg("Seleccioná la hora del desafío.");
+      setErrorMsg("Seleccioná la hora del desafío (solo horas redondas).");
       return;
     }
-
-    // ✅ Normaliza SIEMPRE a HH:00 (por si algún día vuelve a entrar algo raro)
-    const horaRedonda = `${(hora || "00:00").slice(0, 2)}:00`;
 
     setLoading(true);
 
@@ -88,7 +95,8 @@ const CrearDesafio: React.FC<Props> = ({ onClose, onCreated, parejas = [] }) => 
         retadora_pareja_id: idR,
         retada_pareja_id: idD,
         fecha,
-        hora: horaRedonda,
+        // mandamos HH:00 (el service ya lo redondea igual)
+        hora,
         observacion: observacion || "Partido de prueba desde panel",
       });
 
@@ -107,7 +115,7 @@ const CrearDesafio: React.FC<Props> = ({ onClose, onCreated, parejas = [] }) => 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40">
       <div className="w-full max-w-xl max-h-[90vh] rounded-2xl bg-white shadow-2xl flex flex-col">
-        {/* HEADER AZUL, mismo estilo que CargarResultado */}
+        {/* HEADER AZUL */}
         <div className="flex items-center justify-between px-5 py-3 bg-blue-600 text-white rounded-t-2xl">
           <button
             type="button"
@@ -139,7 +147,7 @@ const CrearDesafio: React.FC<Props> = ({ onClose, onCreated, parejas = [] }) => 
               {/* Retadora */}
               <div className="flex-1">
                 <label className="block text-xs font-medium text-slate-600 mb-1">
-                  Pareja retadora
+                  Dupla retadora
                 </label>
                 <select
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -159,7 +167,7 @@ const CrearDesafio: React.FC<Props> = ({ onClose, onCreated, parejas = [] }) => 
               {/* Retada */}
               <div className="flex-1">
                 <label className="block text-xs font-medium text-slate-600 mb-1">
-                  Pareja retada
+                  Dupla desafiada
                 </label>
                 <select
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -195,10 +203,10 @@ const CrearDesafio: React.FC<Props> = ({ onClose, onCreated, parejas = [] }) => 
 
             <div className="flex-1">
               <label className="block text-xs font-medium text-slate-600 mb-1">
-                Hora (redonda)
+                Hora (solo horas redondas)
               </label>
 
-              {/* ✅ Solo horas redondas */}
+              {/* ✅ ACÁ está la corrección real: select de horas redondas */}
               <select
                 value={hora}
                 onChange={(e) => setHora(e.target.value)}
@@ -206,16 +214,11 @@ const CrearDesafio: React.FC<Props> = ({ onClose, onCreated, parejas = [] }) => 
                 disabled={loading}
               >
                 <option value="">Seleccionar...</option>
-                {Array.from({ length: 24 }, (_, h) =>
-                  String(h).padStart(2, "0"),
-                ).map((hh) => {
-                  const val = `${hh}:00`;
-                  return (
-                    <option key={val} value={val}>
-                      {val}
-                    </option>
-                  );
-                })}
+                {horasRedondas.map((h) => (
+                  <option key={h} value={h}>
+                    {h}
+                  </option>
+                ))}
               </select>
             </div>
           </section>
@@ -253,9 +256,7 @@ const CrearDesafio: React.FC<Props> = ({ onClose, onCreated, parejas = [] }) => 
             onClick={(e) => {
               const form = (e.currentTarget.closest(
                 ".flex.flex-col",
-              ) as HTMLElement)?.querySelector("form") as
-                | HTMLFormElement
-                | null;
+              ) as HTMLElement)?.querySelector("form") as HTMLFormElement | null;
               form?.requestSubmit();
             }}
             disabled={loading}
