@@ -16,7 +16,7 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// ✅ DEDUPE SW (por si llega repetido)
+// ✅ DEDUPE SW
 const TTL_MS = 8000;
 const seen = new Map();
 
@@ -50,22 +50,23 @@ messaging.onBackgroundMessage((payload) => {
     return;
   }
 
-  // ✅ CLAVE anti-duplicado:
-  // si viene payload.notification, FCM puede mostrar una automática.
-  // Entonces NO mostramos manualmente.
-  if (payload && payload.notification) {
-    console.log("[SW] payload.notification presente -> no showNotification (evita duplicado)");
-    return;
-  }
+  // ✅ Mostrar SIEMPRE (use notification o data)
+  const title =
+    payload?.notification?.title ||
+    payload?.data?.title ||
+    "Ranking Pádel";
 
-  const title = payload?.data?.title || "Ranking Pádel";
-  const body = payload?.data?.body || "Tenés una nueva notificación";
+  const body =
+    payload?.notification?.body ||
+    payload?.data?.body ||
+    "Tenés una nueva notificación";
 
-  const desafioId = payload?.data?.desafio_id;
+  const data = payload?.data || {};
+  const desafioId = data.desafio_id;
   const url = desafioId ? `/?open_desafio=${encodeURIComponent(desafioId)}` : "/";
 
-  // ✅ tag ayuda a colapsar notis repetidas (misma key)
-  const tag = (payload?.data?.event || "evt") + ":" + (desafioId || "none");
+  // ✅ tag para colapsar repetidos
+  const tag = `${data.event || "evt"}:${desafioId || "none"}`;
 
   self.registration.showNotification(title, {
     body,
