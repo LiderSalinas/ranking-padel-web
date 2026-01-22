@@ -15,7 +15,8 @@ function dedupKeyFromPayload(payload: MessagePayload): string {
   const title = payload.notification?.title || (payload.data?.title as string) || "";
   const body = payload.notification?.body || (payload.data?.body as string) || "";
   const desafioId = (payload.data?.desafio_id as string) || "";
-  return `${desafioId}::${title}::${body}`.trim();
+  const event = (payload.data?.event as string) || (payload.data?.type as string) || "";
+  return `${event}::${desafioId}::${title}::${body}`.trim();
 }
 
 function shouldShowForegroundNotification(payload: MessagePayload): boolean {
@@ -44,7 +45,6 @@ function isServiceWorkerSupported(): boolean {
 }
 
 function isSecureContextOk(): boolean {
-  // en Vercel es https; localhost también está ok
   return typeof window !== "undefined" && (window.isSecureContext || window.location.hostname === "localhost");
 }
 
@@ -57,12 +57,10 @@ function isIOS(): boolean {
 function isInAppBrowser(): boolean {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent || "";
-  // WhatsApp / Instagram / Facebook in-app
   return /FBAN|FBAV|Instagram|Line|WhatsApp/i.test(ua);
 }
 
 function unsupportedMessage(): string {
-  // mensaje “humano” y directo
   if (isIOS()) {
     if (isInAppBrowser()) {
       return "En iPhone, las notificaciones NO funcionan dentro de WhatsApp/Instagram. Abrí el link en Safari.";
@@ -84,8 +82,7 @@ async function getOrRegisterServiceWorker(): Promise<ServiceWorkerRegistration> 
   return reg;
 }
 
-// ------------------ ✅ NUEVO: BRIDGE PARA TOAST EN FOREGROUND ------------------
-// (No cambia tu lógica, solo “emite” info para que App muestre banner SI O SI)
+// ------------------ ✅ BRIDGE PARA TOAST EN FOREGROUND ------------------
 
 let onForegroundToast: ((info: { title: string; body: string; url: string }) => void) | null = null;
 
@@ -136,7 +133,6 @@ export async function activarNotificaciones(): Promise<string> {
     throw new Error("Este navegador no soporta Service Workers (necesarios para push).");
   }
 
-  // ✅ Pedir permiso seguro
   const permission = await Notification.requestPermission();
   if (permission !== "granted") throw new Error("Permiso de notificaciones denegado");
 
@@ -194,7 +190,6 @@ export async function activarNotificacionesYGuardar(): Promise<string> {
   return fcmToken;
 }
 
-// ✅ NUEVO: auto-registro SOLO si ya está concedido (sin pedir permiso)
 export async function tryAutoRegisterPush(): Promise<
   | { ok: true; token: string }
   | {
@@ -206,7 +201,6 @@ export async function tryAutoRegisterPush(): Promise<
   const jwt = localStorage.getItem("token");
   if (!jwt) return { ok: false, reason: "no_session" };
 
-  // ✅ Si no soporta Notification, no crashear
   if (!isNotificationSupported()) {
     return { ok: false, reason: "unsupported", message: unsupportedMessage() };
   }
@@ -215,7 +209,6 @@ export async function tryAutoRegisterPush(): Promise<
   if (perm === "denied") return { ok: false, reason: "denied" };
   if (perm !== "granted") return { ok: false, reason: "need_permission" };
 
-  // ✅ Si no hay SW, tampoco sirve
   if (!isServiceWorkerSupported()) {
     return { ok: false, reason: "unsupported", message: "Este navegador no soporta Service Workers." };
   }
@@ -254,11 +247,8 @@ export async function tryAutoRegisterPush(): Promise<
 }
 
 /**
- * ✅ Listener FOREGROUND (cuando la web está abierta).
- * - Idempotente
- * - Dedupe
- * - En móvil/PWA: usa SW.showNotification (más confiable)
- * - ✅ NUEVO: emite Toast interno para que SE VEA SI O SI
+ * ✅ Listener FOREGROUND (app abierta)
+ * ✅ Solución duplicado: en foreground SOLO TOAST, NO showNotification del sistema.
  */
 export function listenForegroundPush() {
   if (foregroundListenerReady) return;
@@ -266,19 +256,18 @@ export function listenForegroundPush() {
 
   (async () => {
     try {
-      if (!isServiceWorkerSupported()) return;
-
-      await getOrRegisterServiceWorker();
-      try { await navigator.serviceWorker.ready; } catch {}
+      // no crashear si no hay SW
+      if (isServiceWorkerSupported()) {
+        await getOrRegisterServiceWorker();
+        try { await navigator.serviceWorker.ready; } catch {}
+      }
 
       const messaging = getMessaging(app);
 
-      onMessage(messaging, async (payload: MessagePayload) => {
+      onMessage(messaging, (payload: MessagePayload) => {
         console.log("📩 PUSH FOREGROUND payload:", payload);
 
-        // ✅ no tocar Notification si no existe
         if (!isNotificationSupported()) return;
-
         if (Notification.permission !== "granted") return;
 
         if (!shouldShowForegroundNotification(payload)) {
@@ -286,41 +275,8 @@ export function listenForegroundPush() {
           return;
         }
 
-        // ✅ NUEVO: toast dentro de la app (confiable 100%)
+        // ✅ SOLO TOAST (nada de showNotification acá)
         emitForegroundToast(payload);
-
-        const title =
-          payload.notification?.title ||
-          (payload.data?.title as string) ||
-          "Ranking Pádel";
-
-        const body =
-          payload.notification?.body ||
-          (payload.data?.body as string) ||
-          "Tenés una nueva notificación";
-
-        const desafioId = payload.data?.desafio_id as string | undefined;
-
-        const url =
-          desafioId && String(desafioId).trim() !== ""
-            ? `/?open_desafio=${encodeURIComponent(desafioId)}`
-            : `/`;
-
-        const reg = await navigator.serviceWorker.getRegistration();
-        if (reg) {
-          await reg.showNotification(title, { body, data: { url } });
-          return;
-        }
-
-        const notif = new Notification(title, { body, data: { url } });
-        notif.onclick = () => {
-          try {
-            window.focus();
-            window.location.assign(url);
-          } catch {
-            window.open(url, "_blank");
-          }
-        };
       });
     } catch (e) {
       console.error("❌ Error inicializando listener foreground:", e);
