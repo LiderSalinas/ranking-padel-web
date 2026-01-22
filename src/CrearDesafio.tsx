@@ -14,31 +14,12 @@ type Props = {
   parejas?: Pareja[];
 };
 
-// ✅ Horas redondas (ajustá acá si el club maneja otro rango)
-const HORAS_REDONDAS = [
-  "08:00",
-  "09:00",
-  "10:00",
-  "11:00",
-  "12:00",
-  "13:00",
-  "14:00",
-  "15:00",
-  "16:00",
-  "17:00",
-  "18:00",
-  "19:00",
-  "20:00",
-  "21:00",
-  "22:00",
-];
-
 const CrearDesafio: React.FC<Props> = ({ onClose, onCreated, parejas = [] }) => {
   const [retadoraId, setRetadoraId] = useState<string>("");
   const [retadaId, setRetadaId] = useState<string>("");
 
   const [fecha, setFecha] = useState<string>("");
-  const [hora, setHora] = useState<string>("");
+  const [hora, setHora] = useState<string>(""); // ahora se elige solo HH:00
   const [observacion, setObservacion] = useState<string>("");
 
   const [loading, setLoading] = useState(false);
@@ -97,11 +78,8 @@ const CrearDesafio: React.FC<Props> = ({ onClose, onCreated, parejas = [] }) => 
       return;
     }
 
-    // ✅ Doble seguridad: solo horas redondas
-    if (!hora.endsWith(":00")) {
-      setErrorMsg("La hora debe ser redonda (ej: 15:00).");
-      return;
-    }
+    // ✅ Normaliza SIEMPRE a HH:00 (por si algún día vuelve a entrar algo raro)
+    const horaRedonda = `${(hora || "00:00").slice(0, 2)}:00`;
 
     setLoading(true);
 
@@ -110,7 +88,7 @@ const CrearDesafio: React.FC<Props> = ({ onClose, onCreated, parejas = [] }) => 
         retadora_pareja_id: idR,
         retada_pareja_id: idD,
         fecha,
-        hora,
+        hora: horaRedonda,
         observacion: observacion || "Partido de prueba desde panel",
       });
 
@@ -161,7 +139,7 @@ const CrearDesafio: React.FC<Props> = ({ onClose, onCreated, parejas = [] }) => 
               {/* Retadora */}
               <div className="flex-1">
                 <label className="block text-xs font-medium text-slate-600 mb-1">
-                  Dupla retadora
+                  Pareja retadora
                 </label>
                 <select
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -181,7 +159,7 @@ const CrearDesafio: React.FC<Props> = ({ onClose, onCreated, parejas = [] }) => 
               {/* Retada */}
               <div className="flex-1">
                 <label className="block text-xs font-medium text-slate-600 mb-1">
-                  Dupla desafiada
+                  Pareja retada
                 </label>
                 <select
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -217,10 +195,10 @@ const CrearDesafio: React.FC<Props> = ({ onClose, onCreated, parejas = [] }) => 
 
             <div className="flex-1">
               <label className="block text-xs font-medium text-slate-600 mb-1">
-                Hora (solo horas redondas)
+                Hora (redonda)
               </label>
 
-              {/* ✅ Reemplazamos el time picker nativo por un combo de horas */}
+              {/* ✅ Solo horas redondas */}
               <select
                 value={hora}
                 onChange={(e) => setHora(e.target.value)}
@@ -228,11 +206,16 @@ const CrearDesafio: React.FC<Props> = ({ onClose, onCreated, parejas = [] }) => 
                 disabled={loading}
               >
                 <option value="">Seleccionar...</option>
-                {HORAS_REDONDAS.map((h) => (
-                  <option key={h} value={h}>
-                    {h}
-                  </option>
-                ))}
+                {Array.from({ length: 24 }, (_, h) =>
+                  String(h).padStart(2, "0"),
+                ).map((hh) => {
+                  const val = `${hh}:00`;
+                  return (
+                    <option key={val} value={val}>
+                      {val}
+                    </option>
+                  );
+                })}
               </select>
             </div>
           </section>
