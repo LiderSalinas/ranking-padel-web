@@ -70,7 +70,10 @@ export async function reprogramarDesafio(
     body: JSON.stringify(body),
   });
 }
-
+// ✅ NUEVO: trae tu DUPLA (para mostrarla bloqueada en el modal)
+export async function getMiDupla() {
+  return request("/desafios/mi-dupla", { method: "GET" });
+}
 // --------- cargar resultado ---------
 export type CargarResultadoPayload = {
   desafio_id: number;

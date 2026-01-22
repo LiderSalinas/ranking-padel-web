@@ -11,6 +11,7 @@ import {
   aceptarDesafio,
   rechazarDesafio,
   reprogramarDesafio,
+  getMiDupla, // ✅ NUEVO
 } from "./services/desafio";
 import { getParejasDesafiables } from "./services/parejas";
 import Login from "./views/Auth/Login";
@@ -40,8 +41,6 @@ function formatFecha(iso: string): string {
     return iso;
   }
 }
-
-
 
 // ✅ NUEVO: “pegar” hora a :00
 function snapToHour(value: string): string {
@@ -102,6 +101,9 @@ const DesafiosView: React.FC<{
   const [error, setError] = useState<string | null>(null);
 
   const [parejas, setParejas] = useState<ParejaDesafiable[]>([]);
+
+  // ✅ NUEVO: mi dupla (para mostrar bloqueado)
+  const [miDupla, setMiDupla] = useState<{ id: number; etiqueta?: string; nombre?: string } | null>(null);
 
   const [showCrear, setShowCrear] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -175,6 +177,19 @@ const DesafiosView: React.FC<{
   useEffect(() => {
     void cargarDesafios();
     void cargarParejas();
+
+    // ✅ NUEVO: cargar mi dupla (para mostrar retadora bloqueada)
+    (async () => {
+      try {
+        const d = await getMiDupla();
+        setMiDupla(d);
+        // ✅ opcional: guardo id en el form (por compat interna)
+        setFormCrear((p) => ({ ...p, retadora_pareja_id: String(d.id) }));
+      } catch (e) {
+        console.warn("No se pudo cargar mi dupla", e);
+        setMiDupla(null);
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -261,20 +276,27 @@ const DesafiosView: React.FC<{
     setError(null);
 
     try {
-      if (!formCrear.retadora_pareja_id || !formCrear.retada_pareja_id) {
-        throw new Error("Seleccioná las dos duplas.");
+      if (!miDupla?.id) {
+        throw new Error("No se pudo cargar tu dupla retadora. Volvé a iniciar sesión.");
+      }
+      if (!formCrear.retada_pareja_id) {
+        throw new Error("Seleccioná la dupla desafiada.");
       }
       if (!formCrear.fecha || !formCrear.hora) {
         throw new Error("Completá fecha y hora.");
       }
 
+      if (Number(formCrear.retada_pareja_id) === miDupla.id) {
+        throw new Error("No podés desafiar a tu misma dupla.");
+      }
+
+      // ✅ NO mandamos retadora (backend la toma del token)
       await crearDesafio({
-        retadora_pareja_id: Number(formCrear.retadora_pareja_id),
         retada_pareja_id: Number(formCrear.retada_pareja_id),
         fecha: formCrear.fecha,
         hora: formCrear.hora,
         observacion: formCrear.observacion || undefined,
-      });
+      } as any);
 
       setShowCrear(false);
       setFormCrear({
@@ -887,41 +909,25 @@ const DesafiosView: React.FC<{
               </button>
             </div>
 
-            {parejaRetadoraSeleccionada && parejaRetadaSeleccionada && (
-              <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] space-y-1">
-                <p className="flex items-center gap-1">
-                  <span className="text-pink-500">🔑</span>
-                  <span>
-                    {etiquetaRetadora} VS {etiquetaRetada}
-                  </span>
-                </p>
-                {puestoEnJuego && (
-                  <p className="flex items-center gap-1 text-amber-700">
-                    <span>🏅</span>
-                    <span>Puesto en juego: N.º {puestoEnJuego}</span>
-                  </p>
-                )}
-              </div>
-            )}
-
             <form onSubmit={handleSubmitCrear} className="space-y-3">
+              {/* ✅ Retadora bloqueada + Desafiada seleccionable */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Dupla retadora</label>
-                  <select
-                    name="retadora_pareja_id"
-                    value={formCrear.retadora_pareja_id}
-                    onChange={handleCrearChange}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    required
-                  >
-                    <option value="">Seleccionar…</option>
-                    {opcionesParejas.map((p) => (
-                      <option key={p.value} value={p.value}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </select>
+
+                  <div className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-slate-900 truncate">
+                          {miDupla?.etiqueta || miDupla?.nombre || "Cargando tu dupla..."}
+                        </div>
+                        <div className="text-[11px] text-slate-500">Bloqueado (se toma de tu cuenta)</div>
+                      </div>
+                      <span className="text-[11px] font-semibold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-full">
+                        🔒
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
                 <div>
@@ -932,13 +938,16 @@ const DesafiosView: React.FC<{
                     onChange={handleCrearChange}
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     required
+                    disabled={!miDupla?.id}
                   >
                     <option value="">Seleccionar…</option>
-                    {opcionesParejas.map((p) => (
-                      <option key={p.value} value={p.value}>
-                        {p.label}
-                      </option>
-                    ))}
+                    {opcionesParejas
+                      .filter((p) => String(p.value) !== String(miDupla?.id))
+                      .map((p) => (
+                        <option key={p.value} value={p.value}>
+                          {p.label}
+                        </option>
+                      ))}
                   </select>
                 </div>
               </div>
