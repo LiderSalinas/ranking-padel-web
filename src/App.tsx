@@ -908,6 +908,23 @@ const DesafiosView: React.FC<{
                 Cerrar
               </button>
             </div>
+       {etiquetaRetadora && etiquetaRetada && (
+        <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] space-y-1">
+         <p className="flex items-center gap-1">
+         <span className="text-pink-500">🔑</span>
+        <span>
+        {etiquetaRetadora} VS {etiquetaRetada}
+      </span>
+    </p>
+
+    {puestoEnJuego && (
+      <p className="flex items-center gap-1 text-amber-700">
+        <span>🏅</span>
+        <span>Puesto en juego: N.º {puestoEnJuego}</span>
+      </p>
+      )}
+      </div>
+        )}
 
             <form onSubmit={handleSubmitCrear} className="space-y-3">
               {/* ✅ Retadora bloqueada + Desafiada seleccionable */}
