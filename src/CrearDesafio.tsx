@@ -84,7 +84,7 @@ const CrearDesafio: React.FC<Props> = ({ onClose, onCreated, parejas = [] }) => 
     }
 
     if (!hora) {
-      setErrorMsg("Seleccioná la hora del desafío (solo horas redondas).");
+      setErrorMsg("Seleccioná la hora del desafío .");
       return;
     }
 

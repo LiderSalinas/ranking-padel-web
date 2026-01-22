@@ -693,7 +693,7 @@ const DesafiosView: React.FC<{
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Hora (solo horas redondas)</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Hora</label>
                   <select
                     value={formReprogramar.hora}
                     onChange={(e) =>
@@ -983,7 +983,7 @@ const DesafiosView: React.FC<{
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Hora (solo horas redondas)</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Hora </label>
                   <select
                     name="hora"
                     value={formCrear.hora}
