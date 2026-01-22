@@ -203,7 +203,7 @@ const CrearDesafio: React.FC<Props> = ({ onClose, onCreated, parejas = [] }) => 
 
             <div className="flex-1">
               <label className="block text-xs font-medium text-slate-600 mb-1">
-                Hora (solo horas redondas)
+                Hora 
               </label>
 
               {/* ✅ ACÁ está la corrección real: select de horas redondas */}
