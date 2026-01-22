@@ -938,7 +938,7 @@ const DesafiosView: React.FC<{
                         <div className="text-sm font-semibold text-slate-900 truncate">
                           {miDupla?.etiqueta || miDupla?.nombre || "Cargando tu dupla..."}
                         </div>
-                        <div className="text-[11px] text-slate-500">Bloqueado (se toma de tu cuenta)</div>
+                        <div className="text-[11px] text-slate-500"></div>
                       </div>
                       <span className="text-[11px] font-semibold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-full">
                         🔒
