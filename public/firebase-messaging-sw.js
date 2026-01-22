@@ -20,6 +20,15 @@ const messaging = firebase.messaging();
 const TTL_MS = 8000;
 const seen = new Map();
 
+function isIOSLike() {
+  try {
+    const ua = (self.navigator && self.navigator.userAgent) ? self.navigator.userAgent : "";
+    return /iPhone|iPad|iPod/i.test(ua);
+  } catch {
+    return false;
+  }
+}
+
 function makeKey(payload) {
   const data = payload?.data || {};
   const desafioId = data.desafio_id || "";
@@ -44,13 +53,18 @@ function shouldAccept(payload) {
 
 messaging.onBackgroundMessage((payload) => {
   console.log("[SW] onBackgroundMessage:", payload);
+  if (!shouldAccept(payload)) return;
 
-  if (!shouldAccept(payload)) {
-    console.log("[SW] 🧯 dedupe background");
+  const ios = isIOSLike();
+
+  // ✅ CLAVE anti-duplicado (PC/Android):
+  // si trae notification, Chrome puede mostrar una automática.
+  // En iOS muchas veces NO, así que ahí sí la mostramos.
+  if (payload?.notification && !ios) {
+    console.log("[SW] notification presente y NO iOS -> no showNotification (evita duplicado)");
     return;
   }
 
-  // ✅ Mostrar SIEMPRE (use notification o data)
   const title =
     payload?.notification?.title ||
     payload?.data?.title ||
@@ -65,7 +79,6 @@ messaging.onBackgroundMessage((payload) => {
   const desafioId = data.desafio_id;
   const url = desafioId ? `/?open_desafio=${encodeURIComponent(desafioId)}` : "/";
 
-  // ✅ tag para colapsar repetidos
   const tag = `${data.event || "evt"}:${desafioId || "none"}`;
 
   self.registration.showNotification(title, {
