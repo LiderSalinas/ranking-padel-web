@@ -6,8 +6,14 @@ export interface CrearDesafioPayload {
   retadora_pareja_id: number;
   retada_pareja_id: number;
   fecha: string; // "YYYY-MM-DD"
-  hora: string;  // "HH:MM:SS"
+  hora: string;  // "HH:MM:SS" → SIEMPRE redonda
   observacion?: string | null;
+}
+
+// helper interno: fuerza HH:00:00
+function horaRedonda(hora: string): string {
+  const hh = (hora || "00").slice(0, 2);
+  return `${hh}:00:00`;
 }
 
 // --------- listar desafíos del jugador autenticado ---------
@@ -15,16 +21,23 @@ export async function getMisProximosDesafios(): Promise<Desafio[]> {
   return request<Desafio[]>("/desafios/mis-proximos");
 }
 
-// ✅ obtener desafío por ID
+// --------- obtener desafío por ID ---------
 export async function getDesafioById(id: number): Promise<Desafio> {
   return request<Desafio>(`/desafios/${id}`);
 }
 
 // --------- crear desafío ---------
-export async function crearDesafio(payload: CrearDesafioPayload): Promise<Desafio> {
+export async function crearDesafio(
+  payload: CrearDesafioPayload
+): Promise<Desafio> {
+  const body = {
+    ...payload,
+    hora: horaRedonda(payload.hora),
+  };
+
   return request<Desafio>("/desafios", {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify(body),
   });
 }
 
@@ -37,27 +50,30 @@ export async function rechazarDesafio(id: number): Promise<Desafio> {
   return request<Desafio>(`/desafios/${id}/rechazar`, { method: "POST" });
 }
 
-// ✅ NUEVO: Reprogramar desafío (solo fecha y hora)
+// --------- reprogramar desafío ---------
 export type ReprogramarDesafioPayload = {
-  fecha: string; // "YYYY-MM-DD"
-  hora: string;  // "HH:MM" o "HH:MM:SS"
+  fecha: string;
+  hora: string; // "HH:MM" o "HH:MM:SS"
 };
 
 export async function reprogramarDesafio(
   id: number,
   payload: ReprogramarDesafioPayload
 ): Promise<Desafio> {
+  const body = {
+    ...payload,
+    hora: horaRedonda(payload.hora),
+  };
+
   return request<Desafio>(`/desafios/${id}/reprogramar`, {
     method: "PATCH",
-    body: JSON.stringify(payload),
+    body: JSON.stringify(body),
   });
 }
 
-// --------- Cargar resultado de un desafío ---------
+// --------- cargar resultado ---------
 export type CargarResultadoPayload = {
   desafio_id: number;
-
-  // ✅ NUEVO: fecha jugado real (YYYY-MM-DD)
   fecha_jugado?: string | null;
 
   set1_retador: number;
@@ -68,7 +84,9 @@ export type CargarResultadoPayload = {
   set3_desafiado: number | null;
 };
 
-export async function cargarResultadoDesafio(payload: CargarResultadoPayload): Promise<Desafio> {
+export async function cargarResultadoDesafio(
+  payload: CargarResultadoPayload
+): Promise<Desafio> {
   const { desafio_id, ...body } = payload;
 
   return request<Desafio>(`/desafios/${desafio_id}/resultado`, {
