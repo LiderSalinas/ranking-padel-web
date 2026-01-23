@@ -1,4 +1,4 @@
-﻿// src/main.tsx
+﻿/*main.tsx*/
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
@@ -15,10 +15,8 @@ createRoot(document.getElementById("root")!).render(
   const splash = document.getElementById("splash-screen");
   if (!splash) return;
 
-  // Espera a que React pinte al menos 1 frame
   requestAnimationFrame(() => {
     splash.classList.add("hidden");
-    // deja tiempo para la transición (tiene 200ms en tu CSS)
     setTimeout(() => {
       splash.remove();
     }, 250);
@@ -26,7 +24,6 @@ createRoot(document.getElementById("root")!).render(
 })();
 
 // ✅ 2) Registrar Service Worker de Firebase
-// Recomendado: hacerlo después del load para evitar pelear con el primer render
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
