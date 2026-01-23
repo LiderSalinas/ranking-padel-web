@@ -908,22 +908,7 @@ const DesafiosView: React.FC<{
                 </div>
               )}
 
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 mb-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400">Retador</span>
-                  <span className="text-[11px] text-slate-400">Desafiado</span>
-                </div>
-
-                <div className="mt-1">
-                  <p className="text-[13px] font-semibold">
-                    {labelPareja(desafioDetalle.retadora_pareja_id)}
-                  </p>
-                  <p className="text-xs text-slate-400 my-1 text-center">VS</p>
-                  <p className="text-[13px] font-semibold">
-                    {labelPareja(desafioDetalle.retada_pareja_id)}
-                  </p>
-                </div>
-              </div>
+              
 
               {desafioDetalle.observacion && (
                 <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-700 mb-4">
