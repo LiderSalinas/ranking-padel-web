@@ -48,10 +48,7 @@ function snapToHour(value: string): string {
 }
 
 // ✅ NUEVO: weekday en español + formato “Miércoles 21 / 18:00 hs”
-function formatFechaJugadoBonita(
-  fechaYYYYMMDD: string,
-  horaHHMM: string
-): string {
+function formatFechaJugadoBonita(fechaYYYYMMDD: string, horaHHMM: string): string {
   try {
     const d = new Date(`${fechaYYYYMMDD}T00:00:00`);
     const dias = [
@@ -167,8 +164,9 @@ const DesafiosView: React.FC<{
 
   const [showReprogramar, setShowReprogramar] = useState(false);
   const [reprogramando, setReprogramando] = useState(false);
-  const [reprogramarTarget, setReprogramarTarget] =
-    useState<Desafio | null>(null);
+  const [reprogramarTarget, setReprogramarTarget] = useState<Desafio | null>(
+    null
+  );
   const [formReprogramar, setFormReprogramar] = useState({
     fecha: "",
     hora: "",
@@ -191,9 +189,7 @@ const DesafiosView: React.FC<{
 
       // ✅ Orden principal: MÁS RECIENTE primero (fecha/hora DESC)
       const dt = (x: Desafio) =>
-        new Date(
-          `${x.fecha}T${(x.hora || "00:00:00").slice(0, 8)}`
-        ).getTime();
+        new Date(`${x.fecha}T${(x.hora || "00:00:00").slice(0, 8)}`).getTime();
 
       // secundario: estados por “importancia” (si misma fecha/hora)
       const order: Record<string, number> = {
@@ -286,10 +282,7 @@ const DesafiosView: React.FC<{
     () =>
       parejas.map((p) => ({
         value: String(p.id),
-        label:
-          (p as any).etiqueta ??
-          (p as any).nombre ??
-          `Pareja ${p.id}`,
+        label: (p as any).etiqueta ?? (p as any).nombre ?? `Pareja ${p.id}`,
       })),
     [parejas]
   );
@@ -297,10 +290,7 @@ const DesafiosView: React.FC<{
   const mapaParejas = useMemo(() => {
     const map = new Map<number, string>();
     parejas.forEach((p) => {
-      const label =
-        (p as any).etiqueta ??
-        (p as any).nombre ??
-        `Pareja ${p.id}`;
+      const label = (p as any).etiqueta ?? (p as any).nombre ?? `Pareja ${p.id}`;
       map.set(p.id, label);
     });
     return map;
@@ -752,10 +742,7 @@ const DesafiosView: React.FC<{
                               const full = await getDesafioById(d.id);
                               setDesafioDetalle(full);
                             } catch (e) {
-                              console.warn(
-                                "No se pudo traer detalle completo del desafío",
-                                e
-                              );
+                              console.warn("No se pudo traer detalle completo del desafío", e);
                             }
                           }}
                           className={`${btnBase} border border-slate-300 text-slate-700 hover:bg-slate-100`}
@@ -879,12 +866,9 @@ const DesafiosView: React.FC<{
             </div>
 
             <div className="px-6 py-4 overflow-y-auto">
-              {desafioDetalle.estado === "Jugado" &&
-              desafioDetalle.ganador_pareja_id ? (
+              {desafioDetalle.estado === "Jugado" && desafioDetalle.ganador_pareja_id ? (
                 <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 mb-4">
-                  <p className="text-xs font-semibold text-emerald-800">
-                    🏆 Ganador
-                  </p>
+                  <p className="text-xs font-semibold text-emerald-800">🏆 Ganador</p>
                   <p className="text-lg font-bold text-emerald-800">
                     {labelPareja(desafioDetalle.ganador_pareja_id)}
                   </p>
@@ -908,8 +892,6 @@ const DesafiosView: React.FC<{
                 </div>
               )}
 
-              
-
               {desafioDetalle.observacion && (
                 <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-700 mb-4">
                   {desafioDetalle.observacion}
@@ -917,9 +899,7 @@ const DesafiosView: React.FC<{
               )}
 
               <div className="mb-4">
-                <p className="text-[13px] font-semibold mb-2">
-                  Cambio de posiciones
-                </p>
+                <p className="text-[13px] font-semibold mb-2">Cambio de posiciones</p>
 
                 {(() => {
                   const cambio = getCambioPosiciones(desafioDetalle);
@@ -932,10 +912,8 @@ const DesafiosView: React.FC<{
                   }
 
                   const upOrDown = (oldPos: number, newPos: number) => {
-                    if (newPos < oldPos)
-                      return { icon: "⬆️", cls: "text-emerald-700" };
-                    if (newPos > oldPos)
-                      return { icon: "⬇️", cls: "text-red-600" };
+                    if (newPos < oldPos) return { icon: "⬆️", cls: "text-emerald-700" };
+                    if (newPos > oldPos) return { icon: "⬇️", cls: "text-red-600" };
                     return { icon: "➡️", cls: "text-slate-500" };
                   };
 
@@ -1086,9 +1064,7 @@ const DesafiosView: React.FC<{
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <div className="text-sm font-semibold text-slate-900 truncate">
-                          {miDupla?.etiqueta ||
-                            miDupla?.nombre ||
-                            "Cargando tu dupla..."}
+                          {miDupla?.etiqueta || miDupla?.nombre || "Cargando tu dupla..."}
                         </div>
                         <div className="text-[11px] text-slate-500"></div>
                       </div>
@@ -1377,6 +1353,10 @@ const App: React.FC = () => {
             onClick={() => {
               setActiveTab("ranking");
               setRankingScreen("menu");
+
+              // ✅ CORRECCIÓN: resetea filtro a algo válido al entrar al tab ranking
+              // (evita quedar con filtros viejos que te dejan “sin posiciones”)
+              setRankingFilter({ genero: "M", grupo: "A" });
             }}
             className={`flex-1 py-2.5 flex flex-col items-center justify-center text-[11px] ${
               activeTab === "ranking" ? "text-sky-600" : "text-slate-400"

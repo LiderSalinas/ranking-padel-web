@@ -5,12 +5,11 @@ import type { RankingItem } from "../types/ranking";
 // Lo que sea que venga del backend (lo dejamos flexible)
 type RankingApiItem = any;
 
-// ✅ Nuevo: detecta si el backend ya devuelve EXACTAMENTE lo que queremos
+// detecta si el backend ya devuelve EXACTAMENTE lo que queremos
 function isRankingItem(x: any): x is RankingItem {
   return (
     x &&
     typeof x === "object" &&
-    // Campos clave
     "nombre_pareja" in x &&
     "pareja_id" in x &&
     "posicion_actual" in x &&
@@ -19,7 +18,6 @@ function isRankingItem(x: any): x is RankingItem {
 }
 
 function toRankingItem(x: RankingApiItem): RankingItem {
-  // Intentamos sacar el nombre de donde sea:
   const nombre =
     x.nombre_pareja ??
     x.jugadores ??
@@ -48,11 +46,11 @@ export async function getRanking(): Promise<RankingItem[]> {
   const data = await request<RankingApiItem[]>("/ranking/posiciones");
   const arr = data ?? [];
 
-  // ✅ Nuevo: si el backend ya trae el shape perfecto, devolvemos directo (más limpio)
+  // si el backend ya trae el shape perfecto, devolvemos directo
   if (arr.length > 0 && arr.every(isRankingItem)) {
     return arr as RankingItem[];
   }
 
-  // ✅ Fallback: mantenemos tu lógica flexible
+  // fallback flexible
   return arr.map(toRankingItem);
 }

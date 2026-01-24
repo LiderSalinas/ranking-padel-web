@@ -3,16 +3,30 @@ import React, { useEffect, useMemo, useState } from "react";
 import { getRanking } from "../services/ranking";
 import type { RankingItem } from "../types/ranking";
 
-// ✅ NUEVO: props para modo detalle (sin romper si no se pasan)
+// ✅ props para modo detalle (sin romper si no se pasan)
 type Props = {
   grupo?: "A" | "B" | "C";
-  genero?: "M" | "F"; // listo para futuro si backend expone el dato
+  genero?: "M" | "F"; // M = Masculino, F = Femenino
   onBack?: () => void;
 };
 
 // Helper para armar "G/P/R"
 function formatRecord(item: RankingItem): string {
   return `${item.ganados}/${item.perdidos}/${item.retiros}`;
+}
+
+// ✅ NUEVO: helpers para parsear grupo backend ("Masculino A", "Femenino B")
+function getGrupoLetra(grupoLabel: string): "A" | "B" | "C" | "" {
+  const s = (grupoLabel || "").trim().toUpperCase();
+  const last = s.split(/\s+/).pop() || "";
+  return last === "A" || last === "B" || last === "C" ? last : "";
+}
+
+function getGeneroLabel(grupoLabel: string): "M" | "F" | "" {
+  const s = (grupoLabel || "").trim().toUpperCase();
+  if (s.includes("MASCULINO")) return "M";
+  if (s.includes("FEMENINO")) return "F";
+  return "";
 }
 
 // Chip de cuota (al día / atrasado)
@@ -32,15 +46,17 @@ const ChipCuota: React.FC<{ cuota_ok: boolean }> = ({ cuota_ok }) => {
   );
 };
 
-// Chip de grupo (A / B / C)
+// ✅ FIX: Chip de grupo ahora soporta "Masculino A" / "Femenino B"
 const ChipGrupo: React.FC<{ grupo: string }> = ({ grupo }) => {
+  const letra = getGrupoLetra(grupo);
+
   const colores: Record<string, string> = {
     A: "bg-sky-50 text-sky-700 border-sky-100",
     B: "bg-violet-50 text-violet-700 border-violet-100",
     C: "bg-rose-50 text-rose-700 border-rose-100",
   };
 
-  const clase = colores[grupo] ?? "bg-slate-50 text-slate-600 border-slate-100";
+  const clase = colores[letra] ?? "bg-slate-50 text-slate-600 border-slate-100";
 
   return (
     <span
@@ -85,37 +101,42 @@ const RankingView: React.FC<Props> = ({ grupo, genero, onBack }) => {
     void cargarRanking();
   }, []);
 
-  // ✅ NUEVO: filtrado por grupo (y genero listo para futuro)
+  // ✅ FIX: filtrado compatible con "Masculino A/B/C" y "Femenino A/B/C"
   const itemsFiltrados = useMemo(() => {
     let arr = items;
 
-    if (grupo) {
-      arr = arr.filter((x) => String(x.grupo).toUpperCase() === grupo);
+    // Filtra por genero si viene (M/F) usando el texto del grupo
+    if (genero) {
+      arr = arr.filter((x) => getGeneroLabel(String(x.grupo)) === genero);
     }
 
-    // genero queda listo (no se usa porque tu backend no trae campo)
-    void genero;
+    // Filtra por letra A/B/C aunque el backend devuelva "Masculino A"
+    if (grupo) {
+      arr = arr.filter((x) => getGrupoLetra(String(x.grupo)) === grupo);
+    }
 
     return arr;
   }, [items, grupo, genero]);
 
-  // ✅ NUEVO: título dinámico según filtro
-  const titulo = grupo ? `Ranking ${grupo}` : "Ranking general";
+  // ✅ FIX: título dinámico correcto
+  const titulo = (() => {
+    const gen =
+      genero === "M" ? "Masculino" : genero === "F" ? "Femenino" : "General";
+    const gr = grupo ? ` ${grupo}` : "";
+    return `Ranking ${gen}${gr}`;
+  })();
 
   return (
     <div className="min-h-[calc(100vh-120px)] bg-slate-100 text-slate-900">
       <div className="max-w-4xl mx-auto px-4 py-6">
         <header className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">
-              {titulo}
-            </h2>
+            <h2 className="text-lg font-semibold text-slate-900">{titulo}</h2>
             <p className="text-xs text-slate-500 mt-1">
               Posiciones actuales por pareja, con récord y cuota. Modelo AppSheet.
             </p>
           </div>
 
-          {/* ✅ NUEVO: botón volver al menú (si lo pasamos desde App) */}
           {onBack && (
             <button
               type="button"
