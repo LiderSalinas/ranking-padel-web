@@ -12,7 +12,6 @@ import type { Desafio } from "./types/desafios";
 import type { ParejaDesafiable } from "./types/parejas";
 
 import {
-  getMisProximosDesafios,
   getDesafioById,
   crearDesafio,
   aceptarDesafio,
@@ -27,6 +26,7 @@ import CargarResultado from "./CargarResultado";
 import RankingView from "./views/Ranking";
 import RankingMenu from "./views/RankingMenu";
 import JugadoresView from "./views/Jugadores";
+import { getMuroDesafios } from "./services/desafio";
 
 import {
   activarNotificacionesYGuardar,
@@ -194,30 +194,23 @@ const DesafiosView: React.FC<{
       setLoading(true);
       setError(null);
 
-      const data = await getMisProximosDesafios();
+      const data = await getMuroDesafios();
 
-      // ✅ Orden principal: MÁS RECIENTE primero (fecha/hora DESC)
-      const dt = (x: Desafio) =>
-        new Date(`${x.fecha}T${(x.hora || "00:00:00").slice(0, 8)}`).getTime();
 
-      // secundario: estados por “importancia” (si misma fecha/hora)
-      const order: Record<string, number> = {
-        Pendiente: 0,
-        Aceptado: 1,
-        Jugado: 2,
-        Rechazado: 3,
+      // ✅ (3)(4) MURO: MÁS RECIENTE primero
+      // - Si Jugado y viene fecha_jugado: usar esa fecha para que "suba" al cargar resultado
+      // - Caso contrario: usar fecha programada (fecha/hora)
+      const toTime = (d: Desafio) => {
+        const hora = (d.hora || "00:00:00").slice(0, 8);
+
+        const fj = (d as any).fecha_jugado as string | undefined;
+        const baseFecha =
+          d.estado === "Jugado" && fj && fj.trim() ? fj : d.fecha;
+
+        return new Date(`${baseFecha}T${hora}`).getTime();
       };
 
-      const sorted = [...data].sort((a, b) => {
-        const ta = dt(a);
-        const tb = dt(b);
-        if (tb !== ta) return tb - ta;
-
-        const oa = order[a.estado] ?? 99;
-        const ob = order[b.estado] ?? 99;
-        return oa - ob;
-      });
-
+      const sorted = [...data].sort((a, b) => toTime(b) - toTime(a));
       setItems(sorted);
     } catch (err: any) {
       console.error(err);
@@ -228,68 +221,37 @@ const DesafiosView: React.FC<{
   };
 
   const cargarParejas = async (grupo?: string | null) => {
-  try {
-    const data = await getParejasDesafiables(grupo);
-    setParejas(data);
-  } catch (err) {
-    console.error("Error cargando parejas desafiables", err);
-  }
-};
-
-useEffect(() => {
-  void cargarDesafios();
-
-  (async () => {
     try {
-      const d: any = await getMiDupla();
-      setMiDupla(d);
-
-      // opcional: guardo id en el form (compat interna)
-      setFormCrear((p) => ({ ...p, retadora_pareja_id: String(d.id) }));
-
-      // ✅ ahora sí: cargo parejas filtradas por grupo real
-      await cargarParejas(d?.grupo ?? null);
-    } catch (e) {
-      console.warn("No se pudo cargar mi dupla", e);
-      setMiDupla(null);
-
-      // fallback: cargo sin filtro
-      await cargarParejas();
-    }
-  })();
-}, []);
-
-useEffect(() => {
-  void cargarDesafios();
-
-  // ✅ NUEVO: cargar mi dupla primero para saber el grupo y filtrar parejas bien
-  (async () => {
-    try {
-      const d: any = await getMiDupla();
-      setMiDupla(d);
-
-      // ✅ opcional: guardo id en el form (por compat interna)
-      setFormCrear((p) => ({ ...p, retadora_pareja_id: String(d.id) }));
-
-      // ✅ NUEVO: ahora sí cargamos parejas desafiables filtradas por el grupo real
-      const grupoFiltro = d?.grupo ?? null;
-      const data = await getParejasDesafiables(grupoFiltro);
+      const data = await getParejasDesafiables(grupo);
       setParejas(data);
-    } catch (e) {
-      console.warn("No se pudo cargar mi dupla", e);
-      setMiDupla(null);
-
-      // fallback: si no hay dupla, igual intentamos cargar sin filtro (como antes)
-      try {
-        const data = await getParejasDesafiables();
-        setParejas(data);
-      } catch (err) {
-        console.error("Error cargando parejas desafiables", err);
-      }
+    } catch (err) {
+      console.error("Error cargando parejas desafiables", err);
     }
-  })();
-} , []);
+  };
 
+  useEffect(() => {
+    void cargarDesafios();
+
+    // ✅ Cargar mi dupla primero para saber el grupo y filtrar parejas bien
+    (async () => {
+      try {
+        const d: any = await getMiDupla();
+        setMiDupla(d);
+
+        // opcional: guardo id en el form (compat interna)
+        setFormCrear((p) => ({ ...p, retadora_pareja_id: String(d.id) }));
+
+        // ✅ cargo parejas filtradas por grupo real
+        await cargarParejas(d?.grupo ?? null);
+      } catch (e) {
+        console.warn("No se pudo cargar mi dupla", e);
+        setMiDupla(null);
+
+        // fallback: cargo sin filtro
+        await cargarParejas();
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     if (!openDesafioId) return;
@@ -324,12 +286,30 @@ useEffect(() => {
     })();
   }, [openDesafioId, items, loading, clearOpenDesafio]);
 
-  // ✅ CORRECCIÓN: filtro UI para que no te muestre parejas de otra categoría (Masculino/Femenino)
+  // ✅ (2) filtro UI: misma categoría + ±3 posiciones (si existen posiciones)
   const parejasFiltradas = useMemo(() => {
     const myCat = categoriaFromGrupo(miDupla?.grupo);
-    if (!myCat) return parejas;
-    return parejas.filter((p) => categoriaFromGrupo(p.grupo) === myCat);
-  }, [parejas, miDupla?.grupo]);
+    const myPos =
+      (miDupla as any)?.posicion_actual ?? miDupla?.posicion ?? null;
+
+    let out = parejas;
+
+    // misma categoría (Masculino/Femenino)
+    if (myCat) {
+      out = out.filter((p) => categoriaFromGrupo(p.grupo) === myCat);
+    }
+
+    // ±3 posiciones (arriba/abajo)
+    if (myPos != null) {
+      out = out.filter((p) => {
+        const pos = (p as any).posicion_actual ?? (p as any).posicion ?? null;
+        if (pos == null) return true; // si no viene, no bloqueamos para no romper
+        return Math.abs(pos - myPos) <= 3;
+      });
+    }
+
+    return out;
+  }, [parejas, miDupla?.grupo, miDupla?.posicion]);
 
   const opcionesParejas = useMemo(
     () =>
@@ -587,6 +567,13 @@ useEffect(() => {
     };
   };
 
+  // ✅ (6) Permisos para el MODAL detalle (solo UI)
+  const soyRetadorDet =
+    !!(miDupla?.id != null && desafioDetalle && desafioDetalle.retadora_pareja_id === miDupla.id);
+  const soyDesafiadoDet =
+    !!(miDupla?.id != null && desafioDetalle && desafioDetalle.retada_pareja_id === miDupla.id);
+  const soyParteDet = soyRetadorDet || soyDesafiadoDet;
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 pb-16">
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
@@ -672,9 +659,9 @@ useEffect(() => {
         </header>
 
         <section className="bg-white rounded-2xl shadow-sm p-6 mt-2">
-          <h2 className="text-lg font-semibold text-center">Mis próximos desafíos</h2>
+          <h2 className="text-lg font-semibold text-center">Muro de desafíos</h2>
           <p className="text-xs text-center text-slate-500 mt-1">
-            Se muestran desafíos con estado Pendiente / Aceptado para el jugador autenticado.
+            Se muestran desafíos por jugar y jugados, ordenados por lo más reciente.
           </p>
 
           <div className="mt-6 space-y-3">
@@ -686,7 +673,7 @@ useEffect(() => {
 
             {!loading && !error && items.length === 0 && (
               <p className="text-sm text-slate-400 text-center">
-                No tenés desafíos próximos.
+                No hay desafíos para mostrar.
               </p>
             )}
 
@@ -696,6 +683,13 @@ useEffect(() => {
                 const tituloUI = construirTituloDesafio(d);
                 const fechaInfo = buildFechaLinea(d);
                 const tituloCls = tituloColorByEstado(d.estado);
+
+                // ✅ (6) permisos UI por desafío
+                const soyRetador =
+                  miDupla?.id != null && d.retadora_pareja_id === miDupla.id;
+                const soyDesafiado =
+                  miDupla?.id != null && d.retada_pareja_id === miDupla.id;
+                const soyParte = soyRetador || soyDesafiado;
 
                 const btnBase =
                   "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition active:scale-[0.98]";
@@ -731,49 +725,65 @@ useEffect(() => {
                       <div className="flex flex-wrap justify-end gap-2">
                         {d.estado === "Pendiente" && (
                           <>
-                            <button
-                              onClick={() => handleAceptar(d.id)}
-                              className={`${btnBase} bg-sky-600 text-white hover:bg-sky-700`}
-                              title="Aceptar"
-                            >
-                              ✅ <span>Aceptar</span>
-                            </button>
+                            {soyDesafiado ? (
+                              <>
+                                <button
+                                  onClick={() => handleAceptar(d.id)}
+                                  className={`${btnBase} bg-sky-600 text-white hover:bg-sky-700`}
+                                  title="Aceptar"
+                                >
+                                  ✅ <span>Aceptar</span>
+                                </button>
 
-                            <button
-                              onClick={() => handleRechazar(d.id)}
-                              className={`${btnBase} border border-orange-300 text-orange-700 hover:bg-orange-50`}
-                              title="Rechazar"
-                            >
-                              ❌ <span>Rechazar</span>
-                            </button>
+                                <button
+                                  onClick={() => handleRechazar(d.id)}
+                                  className={`${btnBase} border border-orange-300 text-orange-700 hover:bg-orange-50`}
+                                  title="Rechazar"
+                                >
+                                  ❌ <span>Rechazar</span>
+                                </button>
 
-                            <button
-                              onClick={() => abrirReprogramar(d)}
-                              className={`${btnBase} border border-indigo-300 text-indigo-700 hover:bg-indigo-50`}
-                              title="Reprogramar"
-                            >
-                              🗓️ <span>Repro</span>
-                            </button>
+                                <button
+                                  onClick={() => abrirReprogramar(d)}
+                                  className={`${btnBase} border border-indigo-300 text-indigo-700 hover:bg-indigo-50`}
+                                  title="Reprogramar"
+                                >
+                                  🗓️ <span>Repro</span>
+                                </button>
+                              </>
+                            ) : (
+                              <span className="text-[11px] text-slate-400">
+                                Solo el desafiado puede aceptar / rechazar
+                              </span>
+                            )}
                           </>
                         )}
 
                         {d.estado === "Aceptado" && (
                           <>
-                            <button
-                              onClick={() => abrirModalResultado(d)}
-                              className={`${btnBase} bg-emerald-600 text-white hover:bg-emerald-700`}
-                              title="Cargar resultado"
-                            >
-                              🏆 <span>Resultado</span>
-                            </button>
+                            {soyParte ? (
+                              <button
+                                onClick={() => abrirModalResultado(d)}
+                                className={`${btnBase} bg-emerald-600 text-white hover:bg-emerald-700`}
+                                title="Cargar resultado"
+                              >
+                                🏆 <span>Resultado</span>
+                              </button>
+                            ) : (
+                              <span className="text-[11px] text-slate-400">
+                                Partido aceptado (solo lectura)
+                              </span>
+                            )}
 
-                            <button
-                              onClick={() => handleRechazar(d.id)}
-                              className={`${btnBase} border border-orange-300 text-orange-700 hover:bg-orange-50`}
-                              title="Rechazar"
-                            >
-                              ❌ <span>Rechazar</span>
-                            </button>
+                            {soyDesafiado && (
+                              <button
+                                onClick={() => handleRechazar(d.id)}
+                                className={`${btnBase} border border-orange-300 text-orange-700 hover:bg-orange-50`}
+                                title="Rechazar"
+                              >
+                                ❌ <span>Rechazar</span>
+                              </button>
+                            )}
                           </>
                         )}
 
@@ -1003,58 +1013,75 @@ useEffect(() => {
               <div className="flex flex-wrap gap-2 justify-end">
                 {desafioDetalle.estado === "Pendiente" && (
                   <>
-                    <button
-                      onClick={async () => {
-                        await handleAceptar(desafioDetalle.id);
-                        cerrarDetalle();
-                      }}
-                      className="rounded-full bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700"
-                    >
-                      Aceptar
-                    </button>
+                    {soyDesafiadoDet ? (
+                      <>
+                        <button
+                          onClick={async () => {
+                            await handleAceptar(desafioDetalle.id);
+                            cerrarDetalle();
+                          }}
+                          className="rounded-full bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700"
+                        >
+                          Aceptar
+                        </button>
 
-                    <button
-                      onClick={async () => {
-                        await handleRechazar(desafioDetalle.id);
-                        cerrarDetalle();
-                      }}
-                      className="rounded-full border border-orange-300 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-50"
-                    >
-                      Rechazar
-                    </button>
+                        <button
+                          onClick={async () => {
+                            await handleRechazar(desafioDetalle.id);
+                            cerrarDetalle();
+                          }}
+                          className="rounded-full border border-orange-300 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-50"
+                        >
+                          Rechazar
+                        </button>
 
-                    <button
-                      onClick={() => {
-                        abrirReprogramar(desafioDetalle);
-                        cerrarDetalle();
-                      }}
-                      className="rounded-full border border-indigo-300 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50"
-                    >
-                      Reprogramar
-                    </button>
+                        <button
+                          onClick={() => {
+                            abrirReprogramar(desafioDetalle);
+                            cerrarDetalle();
+                          }}
+                          className="rounded-full border border-indigo-300 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50"
+                        >
+                          Reprogramar
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-xs text-slate-400">
+                        Solo el desafiado puede aceptar / rechazar
+                      </span>
+                    )}
                   </>
                 )}
 
                 {desafioDetalle.estado === "Aceptado" && (
                   <>
-                    <button
-                      onClick={() => {
-                        abrirModalResultado(desafioDetalle);
-                        cerrarDetalle();
-                      }}
-                      className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
-                    >
-                      Cargar resultado
-                    </button>
-                    <button
-                      onClick={async () => {
-                        await handleRechazar(desafioDetalle.id);
-                        cerrarDetalle();
-                      }}
-                      className="rounded-full border border-orange-300 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-50"
-                    >
-                      Rechazar
-                    </button>
+                    {soyParteDet ? (
+                      <button
+                        onClick={() => {
+                          abrirModalResultado(desafioDetalle);
+                          cerrarDetalle();
+                        }}
+                        className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
+                      >
+                        Cargar resultado
+                      </button>
+                    ) : (
+                      <span className="text-xs text-slate-400">
+                        Partido aceptado (solo lectura)
+                      </span>
+                    )}
+
+                    {soyDesafiadoDet && (
+                      <button
+                        onClick={async () => {
+                          await handleRechazar(desafioDetalle.id);
+                          cerrarDetalle();
+                        }}
+                        className="rounded-full border border-orange-300 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-50"
+                      >
+                        Rechazar
+                      </button>
+                    )}
                   </>
                 )}
 
@@ -1154,7 +1181,9 @@ useEffect(() => {
                   {/* ✅ hint sutil para que se entienda el filtro */}
                   {miDupla?.grupo && (
                     <p className="mt-1 text-[10px] text-slate-400">
-                      Mostrando parejas de: <span className="font-semibold">{miDupla.grupo}</span>
+                      Mostrando parejas de:{" "}
+                      <span className="font-semibold">{miDupla.grupo}</span>{" "}
+                      (±3 posiciones)
                     </p>
                   )}
                 </div>

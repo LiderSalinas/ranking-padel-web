@@ -135,3 +135,47 @@ export async function cargarResultadoDesafio(
     body: JSON.stringify(body),
   });
 }
+
+/* =========================================================
+   ✅ NUEVO (pedido cliente): "Muro" para que TODOS vean
+   - Partidos por jugar (global): /desafios/proximos
+   - Partidos ya jugados (al menos del usuario): /desafios/mis-desafios
+   (Si mañana agregás endpoint de jugados global, lo enchufamos acá)
+========================================================= */
+
+// helper: timestamp para ordenar "más reciente primero"
+function desafioTime(d: Desafio): number {
+  const hora = (d.hora || "00:00:00").slice(0, 8);
+
+  const fj = (d as any).fecha_jugado as string | undefined;
+  const baseFecha =
+    d.estado === "Jugado" && fj && fj.trim() ? fj : d.fecha;
+
+  return new Date(`${baseFecha}T${hora}`).getTime();
+}
+
+// ✅ Muro: combina global por jugar + mis jugados, sin duplicar
+export async function getMuroDesafios(): Promise<Desafio[]> {
+  const [proximos, mis] = await Promise.all([
+    getProximosDesafios(),
+    getMisDesafios(),
+  ]);
+
+  // de mis, tomamos los Jugados (histórico)
+  const misJugados = (mis || []).filter((d) => d.estado === "Jugado");
+
+  // unir y deduplicar por id
+  const map = new Map<number, Desafio>();
+  for (const d of [...(proximos || []), ...misJugados]) {
+    map.set(d.id, d);
+  }
+
+  // ordenar por más reciente (jugados usan fecha_jugado si existe)
+  return Array.from(map.values()).sort((a, b) => desafioTime(b) - desafioTime(a));
+}
+
+// (opcional) si querés tu historial ordenado por muro
+export async function getTodosMisDesafiosOrdenado(): Promise<Desafio[]> {
+  const mis = await getMisDesafios();
+  return [...(mis || [])].sort((a, b) => desafioTime(b) - desafioTime(a));
+}
