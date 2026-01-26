@@ -10,7 +10,8 @@ function detectProvider(email: string): string {
   const e = email.toLowerCase().trim();
   const domain = e.split("@")[1] || "";
   if (domain.includes("gmail")) return "Google";
-  if (domain.includes("outlook") || domain.includes("hotmail") || domain.includes("live")) return "Microsoft";
+  if (domain.includes("outlook") || domain.includes("hotmail") || domain.includes("live"))
+    return "Microsoft";
   if (domain.includes("icloud")) return "Apple";
   if (domain.includes("yahoo")) return "Yahoo";
   return domain ? domain : "tu proveedor";
@@ -46,6 +47,9 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
       const auto = await tryAutoRegisterPush();
 
       if (auto.ok) {
+        // ✅ importante: marcamos que ya se registró alguna vez
+        localStorage.setItem("push_registered_once", "1");
+
         setMsg("✅ Login OK · Notificaciones listas");
         setShowEnablePush(false);
       } else {
@@ -54,7 +58,7 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
           setShowEnablePush(true);
         }
 
-        // si no soporta (WhatsApp iPhone / in-app) → mostramos CTA para que al tocar le explique
+        // si no soporta → mostramos CTA para explicar
         if (auto.reason === "unsupported") {
           setShowEnablePush(true);
           if (auto.message) setMsg(`ℹ️ ${auto.message}`);
@@ -62,6 +66,9 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
 
         // si ya estaba registrado, no mostrar CTA
         if (auto.reason === "already_registered") {
+          // ✅ marcamos igual, porque ya está listo
+          localStorage.setItem("push_registered_once", "1");
+
           setShowEnablePush(false);
         }
       }
@@ -80,10 +87,13 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
 
     try {
       await activarNotificacionesYGuardar();
+
+      // ✅ importante: marcamos el flag para que no vuelva a molestarte
+      localStorage.setItem("push_registered_once", "1");
+
       setMsg("✅ Notificaciones activadas");
       setShowEnablePush(false);
     } catch (err: any) {
-      // acá van a caer los mensajes claros tipo “abrí en Safari…”
       setError(err?.message || "Error activando notificaciones");
       setShowEnablePush(true);
     }
@@ -117,7 +127,8 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
                 required
               />
               <p className="text-[11px] text-slate-500 mt-1">
-                Vas a ingresar con: <span className="font-semibold">{provider}</span>
+                Vas a ingresar con:{" "}
+                <span className="font-semibold">{provider}</span>
               </p>
             </div>
 
@@ -152,7 +163,8 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
           )}
 
           <p className="text-[11px] text-slate-400 text-center">
-            Tip: iPhone → abrí en Safari e instalá (Agregar a pantalla de inicio). Android → Chrome/PWA.
+            Tip: iPhone → abrí en Safari e instalá (Agregar a pantalla de
+            inicio). Android → Chrome/PWA.
           </p>
         </div>
       </div>

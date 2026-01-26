@@ -1,4 +1,3 @@
-// src/services/auth.ts
 import { request } from "./api";
 
 export type LoginLinkResponse = {
