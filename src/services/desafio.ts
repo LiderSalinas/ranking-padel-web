@@ -3,16 +3,31 @@ import { request } from "./api";
 import type { Desafio } from "../types/desafios";
 
 export interface CrearDesafioPayload {
-  retadora_pareja_id: number;
+  // ⚠️ Backend ahora calcula retadora por token.
+  // Mantengo el campo para no romper llamadas viejas, pero NO se envía.
+  retadora_pareja_id?: number;
+
   retada_pareja_id: number;
   fecha: string; // "YYYY-MM-DD"
-  hora: string;  // "HH:MM:SS" → SIEMPRE redonda
+  hora: string;  // "H" | "HH" | "H:MM" | "HH:MM" | "HH:MM:SS" -> se fuerza HH:00:00
   observacion?: string | null;
 }
 
-// helper interno: fuerza HH:00:00
+// helper interno: fuerza HH:00:00 (acepta "H", "HH", "H:MM", "HH:MM" o "HH:MM:SS")
 function horaRedonda(hora: string): string {
-  const hh = (hora || "00").slice(0, 2);
+  const h = (hora || "").trim();
+
+  // si viene vacío, por defecto 00:00:00
+  if (!h) return "00:00:00";
+
+  // capturo la primera parte antes de ":" (puede ser "7" o "07" o "07:30")
+  const first = h.split(":")[0] ?? "";
+  const hhNum = Number(first);
+
+  // si no es número válido o fuera de 0-23, fallback
+  if (!Number.isFinite(hhNum) || hhNum < 0 || hhNum > 23) return "00:00:00";
+
+  const hh = String(hhNum).padStart(2, "0");
   return `${hh}:00:00`;
 }
 
@@ -21,18 +36,29 @@ export async function getMisProximosDesafios(): Promise<Desafio[]> {
   return request<Desafio[]>("/desafios/mis-proximos");
 }
 
+// --------- listar TODOS mis desafíos (histórico) ---------
+export async function getMisDesafios(): Promise<Desafio[]> {
+  return request<Desafio[]>("/desafios/mis-desafios");
+}
+
+// --------- listar próximos global (pendiente/aceptado) ---------
+export async function getProximosDesafios(): Promise<Desafio[]> {
+  return request<Desafio[]>("/desafios/proximos");
+}
+
 // --------- obtener desafío por ID ---------
 export async function getDesafioById(id: number): Promise<Desafio> {
   return request<Desafio>(`/desafios/${id}`);
 }
 
 // --------- crear desafío ---------
-export async function crearDesafio(
-  payload: CrearDesafioPayload
-): Promise<Desafio> {
+export async function crearDesafio(payload: CrearDesafioPayload): Promise<Desafio> {
+  // ✅ backend calcula retadora por token, así que no mandamos retadora_pareja_id
   const body = {
-    ...payload,
+    retada_pareja_id: payload.retada_pareja_id,
+    fecha: payload.fecha,
     hora: horaRedonda(payload.hora),
+    observacion: payload.observacion ?? null,
   };
 
   return request<Desafio>("/desafios", {
@@ -53,7 +79,7 @@ export async function rechazarDesafio(id: number): Promise<Desafio> {
 // --------- reprogramar desafío ---------
 export type ReprogramarDesafioPayload = {
   fecha: string;
-  hora: string; // "HH:MM" o "HH:MM:SS"
+  hora: string; // "H" | "HH" | "H:MM" | "HH:MM" | "HH:MM:SS" -> se fuerza HH:00:00
 };
 
 export async function reprogramarDesafio(
@@ -61,7 +87,7 @@ export async function reprogramarDesafio(
   payload: ReprogramarDesafioPayload
 ): Promise<Desafio> {
   const body = {
-    ...payload,
+    fecha: payload.fecha,
     hora: horaRedonda(payload.hora),
   };
 
@@ -70,13 +96,25 @@ export async function reprogramarDesafio(
     body: JSON.stringify(body),
   });
 }
-// ✅ NUEVO: trae tu DUPLA (para mostrarla bloqueada en el modal)
-export async function getMiDupla() {
-  return request("/desafios/mi-dupla", { method: "GET" });
+
+// ✅ trae tu DUPLA (para mostrarla bloqueada en el modal)
+export type MiDuplaResponse = {
+  id: number;
+  etiqueta: string; // "Nombre Apellido / Nombre Apellido"
+  nombre?: string | null;
+  grupo?: string | null;
+  posicion?: number | null;
+};
+
+export async function getMiDupla(): Promise<MiDuplaResponse> {
+  return request<MiDuplaResponse>("/desafios/mi-dupla");
 }
+
 // --------- cargar resultado ---------
 export type CargarResultadoPayload = {
   desafio_id: number;
+
+  // backend acepta null o no enviar, y si no viene usa hoy
   fecha_jugado?: string | null;
 
   set1_retador: number;

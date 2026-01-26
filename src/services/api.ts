@@ -15,6 +15,44 @@ function buildUrl(path: string) {
   return `${base}${p}`;
 }
 
+// ✅ NUEVO: stringify robusto para detail que puede venir como string | array | object
+function stringifyDetail(detail: any): string {
+  if (detail == null) return "Error desconocido.";
+
+  if (typeof detail === "string") return detail;
+
+  // Pydantic típico: [{loc, msg, type}, ...]
+  if (Array.isArray(detail)) {
+    // Si son objetos con msg, los concatenamos
+    const msgs = detail
+      .map((x) => {
+        if (!x) return "";
+        if (typeof x === "string") return x;
+        if (typeof x?.msg === "string") return x.msg;
+        return JSON.stringify(x);
+      })
+      .filter(Boolean);
+
+    if (msgs.length) return msgs.join(" | ");
+    return JSON.stringify(detail);
+  }
+
+  if (typeof detail === "object") {
+    // a veces viene {message:"..."} o {error:"..."}
+    const maybeMsg =
+      (detail as any).message ||
+      (detail as any).error ||
+      (detail as any).detail ||
+      null;
+
+    if (typeof maybeMsg === "string") return maybeMsg;
+
+    return JSON.stringify(detail);
+  }
+
+  return String(detail);
+}
+
 export async function request<T = any>(
   path: string,
   options: RequestInit = {}
@@ -23,8 +61,15 @@ export async function request<T = any>(
 
   const headers: HeadersInit = {
     ...(options.headers || {}),
-    "Content-Type": "application/json",
   };
+
+  // ✅ NUEVO: si body es FormData NO setear Content-Type (el browser pone el boundary)
+  const isFormData =
+    typeof FormData !== "undefined" && options.body instanceof FormData;
+
+  if (!isFormData) {
+    (headers as any)["Content-Type"] = (headers as any)["Content-Type"] || "application/json";
+  }
 
   // ✅ Si es ngrok free, evita el HTML warning interstitial
   if (API_BASE_URL.includes("ngrok-free")) {
@@ -54,13 +99,23 @@ export async function request<T = any>(
   };
 
   if (!resp.ok) {
-    // Si viene JSON con detail, lo mostramos
+    // ✅ NUEVO: si es 401, limpiamos token para no quedar trabado
+    if (resp.status === 401) {
+      try {
+        localStorage.removeItem("token");
+      } catch {}
+    }
+
     const data = contentType.includes("application/json") ? tryJson() : null;
+
+    // ✅ NUEVO: soporta detail / message / error
     const detail =
-      data?.detail
-        ? typeof data.detail === "string"
-          ? data.detail
-          : JSON.stringify(data.detail)
+      data?.detail != null
+        ? stringifyDetail(data.detail)
+        : data?.message != null
+        ? stringifyDetail(data.message)
+        : data?.error != null
+        ? stringifyDetail(data.error)
         : raw?.slice(0, 200) || `HTTP ${resp.status}`;
 
     throw new Error(detail);

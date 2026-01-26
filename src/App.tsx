@@ -76,6 +76,13 @@ function buildHorasRedondas(): string[] {
   return out;
 }
 
+// ✅ NUEVO: categoría desde grupo (Masculino A -> Masculino)
+function categoriaFromGrupo(grupo?: string | null): string {
+  const g = (grupo || "").trim();
+  if (!g) return "";
+  return g.split(" ")[0].toLowerCase();
+}
+
 type Estado = Desafio["estado"];
 
 const BadgeEstado: React.FC<{ estado: Estado }> = ({ estado }) => {
@@ -150,6 +157,8 @@ const DesafiosView: React.FC<{
     id: number;
     etiqueta?: string;
     nombre?: string;
+    grupo?: string | null;     // ✅ NUEVO
+    posicion?: number | null;  // ✅ NUEVO
   } | null>(null);
 
   const [showCrear, setShowCrear] = useState(false);
@@ -218,32 +227,69 @@ const DesafiosView: React.FC<{
     }
   };
 
-  const cargarParejas = async () => {
+  const cargarParejas = async (grupo?: string | null) => {
+  try {
+    const data = await getParejasDesafiables(grupo);
+    setParejas(data);
+  } catch (err) {
+    console.error("Error cargando parejas desafiables", err);
+  }
+};
+
+useEffect(() => {
+  void cargarDesafios();
+
+  (async () => {
     try {
-      const data = await getParejasDesafiables();
-      setParejas(data);
-    } catch (err) {
-      console.error("Error cargando parejas desafiables", err);
+      const d: any = await getMiDupla();
+      setMiDupla(d);
+
+      // opcional: guardo id en el form (compat interna)
+      setFormCrear((p) => ({ ...p, retadora_pareja_id: String(d.id) }));
+
+      // ✅ ahora sí: cargo parejas filtradas por grupo real
+      await cargarParejas(d?.grupo ?? null);
+    } catch (e) {
+      console.warn("No se pudo cargar mi dupla", e);
+      setMiDupla(null);
+
+      // fallback: cargo sin filtro
+      await cargarParejas();
     }
-  };
+  })();
+}, []);
 
-  useEffect(() => {
-    void cargarDesafios();
-    void cargarParejas();
+useEffect(() => {
+  void cargarDesafios();
 
-    // ✅ NUEVO: cargar mi dupla (para mostrar retadora bloqueada)
-    (async () => {
+  // ✅ NUEVO: cargar mi dupla primero para saber el grupo y filtrar parejas bien
+  (async () => {
+    try {
+      const d: any = await getMiDupla();
+      setMiDupla(d);
+
+      // ✅ opcional: guardo id en el form (por compat interna)
+      setFormCrear((p) => ({ ...p, retadora_pareja_id: String(d.id) }));
+
+      // ✅ NUEVO: ahora sí cargamos parejas desafiables filtradas por el grupo real
+      const grupoFiltro = d?.grupo ?? null;
+      const data = await getParejasDesafiables(grupoFiltro);
+      setParejas(data);
+    } catch (e) {
+      console.warn("No se pudo cargar mi dupla", e);
+      setMiDupla(null);
+
+      // fallback: si no hay dupla, igual intentamos cargar sin filtro (como antes)
       try {
-        const d = await getMiDupla();
-        setMiDupla(d);
-        // ✅ opcional: guardo id en el form (por compat interna)
-        setFormCrear((p) => ({ ...p, retadora_pareja_id: String(d.id) }));
-      } catch (e) {
-        console.warn("No se pudo cargar mi dupla", e);
-        setMiDupla(null);
+        const data = await getParejasDesafiables();
+        setParejas(data);
+      } catch (err) {
+        console.error("Error cargando parejas desafiables", err);
       }
-    })();
-  }, []);
+    }
+  })();
+} , []);
+
 
   useEffect(() => {
     if (!openDesafioId) return;
@@ -278,23 +324,30 @@ const DesafiosView: React.FC<{
     })();
   }, [openDesafioId, items, loading, clearOpenDesafio]);
 
+  // ✅ CORRECCIÓN: filtro UI para que no te muestre parejas de otra categoría (Masculino/Femenino)
+  const parejasFiltradas = useMemo(() => {
+    const myCat = categoriaFromGrupo(miDupla?.grupo);
+    if (!myCat) return parejas;
+    return parejas.filter((p) => categoriaFromGrupo(p.grupo) === myCat);
+  }, [parejas, miDupla?.grupo]);
+
   const opcionesParejas = useMemo(
     () =>
-      parejas.map((p) => ({
+      parejasFiltradas.map((p) => ({
         value: String(p.id),
         label: (p as any).etiqueta ?? (p as any).nombre ?? `Pareja ${p.id}`,
       })),
-    [parejas]
+    [parejasFiltradas]
   );
 
   const mapaParejas = useMemo(() => {
     const map = new Map<number, string>();
-    parejas.forEach((p) => {
+    parejasFiltradas.forEach((p) => {
       const label = (p as any).etiqueta ?? (p as any).nombre ?? `Pareja ${p.id}`;
       map.set(p.id, label);
     });
     return map;
-  }, [parejas]);
+  }, [parejasFiltradas]);
 
   const construirTituloDesafio = (d: Desafio): string => {
     const retadora = mapaParejas.get(d.retadora_pareja_id);
@@ -442,10 +495,10 @@ const DesafiosView: React.FC<{
     }
   };
 
-  const parejaRetadoraSeleccionada = parejas.find(
+  const parejaRetadoraSeleccionada = parejasFiltradas.find(
     (p) => String(p.id) === formCrear.retadora_pareja_id
   );
-  const parejaRetadaSeleccionada = parejas.find(
+  const parejaRetadaSeleccionada = parejasFiltradas.find(
     (p) => String(p.id) === formCrear.retada_pareja_id
   );
 
@@ -461,11 +514,12 @@ const DesafiosView: React.FC<{
       (parejaRetadaSeleccionada as any).nombre ??
       `Pareja ${parejaRetadaSeleccionada.id}`);
 
+  // ✅ CORRECCIÓN: tu tipo real trae posicion_actual (no "posicion")
   const puestoEnJuego =
     parejaRetadoraSeleccionada && parejaRetadaSeleccionada
       ? Math.min(
-          (parejaRetadoraSeleccionada as any).posicion ?? 0,
-          (parejaRetadaSeleccionada as any).posicion ?? 0
+          (parejaRetadoraSeleccionada as any).posicion_actual ?? 0,
+          (parejaRetadaSeleccionada as any).posicion_actual ?? 0
         )
       : null;
 
@@ -1096,6 +1150,13 @@ const DesafiosView: React.FC<{
                         </option>
                       ))}
                   </select>
+
+                  {/* ✅ hint sutil para que se entienda el filtro */}
+                  {miDupla?.grupo && (
+                    <p className="mt-1 text-[10px] text-slate-400">
+                      Mostrando parejas de: <span className="font-semibold">{miDupla.grupo}</span>
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1355,7 +1416,6 @@ const App: React.FC = () => {
               setRankingScreen("menu");
 
               // ✅ CORRECCIÓN: resetea filtro a algo válido al entrar al tab ranking
-              // (evita quedar con filtros viejos que te dejan “sin posiciones”)
               setRankingFilter({ genero: "M", grupo: "A" });
             }}
             className={`flex-1 py-2.5 flex flex-col items-center justify-center text-[11px] ${

@@ -8,12 +8,16 @@ export interface Desafio {
   retadora_pareja_id: number;
   retada_pareja_id: number;
 
-  fecha: string; // "YYYY-MM-DD"
-  hora: string;  // "HH:MM:SS" (SIEMPRE redonda)
+  ganador_pareja_id: number | null;
 
-  observacion: string | null;
   estado: EstadoDesafio;
 
+  fecha: string; // "YYYY-MM-DD"
+  hora: string;  // "HH:MM:SS" (redonda)
+
+  observacion: string | null;
+
+  // flags / tracking
   limite_semana_ok: boolean;
   swap_aplicado: boolean;
   pos_retadora_old: number | null;
@@ -21,14 +25,15 @@ export interface Desafio {
   ranking_aplicado: boolean;
 
   titulo_desafio: string;
-  ganador_pareja_id: number | null;
 
+  // timestamps
   created_at: string;
   updated_at: string;
 
+  // ✅ calculado (no necesariamente viene siempre)
   puesto_en_juego?: number | null;
 
-  // detalle / historial
+  // ✅ resultado (guardado en BD)
   fecha_jugado?: string | null;
 
   set1_retador?: number | null;
@@ -40,6 +45,7 @@ export interface Desafio {
   set3_retador?: number | null;
   set3_desafiado?: number | null;
 
+  // ⚠️ Estos NO existen en tu backend actual: los dejo opcionales por compat
   resultado_cargado_por?: string | null;
   resultado_cargado_at?: string | null;
 }
