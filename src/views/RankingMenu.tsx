@@ -49,7 +49,7 @@ const RankingMenu: React.FC<Props> = ({ onSelect }) => {
         <header className="mb-4">
           <div className="border-l-4 border-blue-700 pl-3">
             <h2 className="text-[26px] font-extrabold text-left text-slate-900 tracking-tight leading-tight">
-              Ranking
+              Ranking General
             </h2>
 
             <p className="text-sm text-left text-slate-500 mt-1 font-semibold">
@@ -109,7 +109,7 @@ const RankingMenu: React.FC<Props> = ({ onSelect }) => {
                 onClick={() => onSelect({ genero: "F", grupo: "C" })}
               />
             </div>
-            
+
           </section>
         </div>
       </div>
