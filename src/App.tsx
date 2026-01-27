@@ -708,7 +708,7 @@ const DesafiosView: React.FC<{
           </p>
 
           <div className="mt-6 space-y-3">
-            {loading && <p className="text-xs text-slate-400">Cargando muro…</p>}
+            {loading && <p className="text-xs text-slate-400">Cargando Desafios</p>}
 
             {!loading && error && (
               <p className="text-sm text-red-500 text-center">{error}</p>
