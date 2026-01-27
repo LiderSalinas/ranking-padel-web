@@ -702,14 +702,19 @@ const DesafiosView: React.FC<{
         </header>
 
               <section className="bg-white rounded-2xl shadow-sm p-6 mt-2">
-          <h2 className="text-2xl font-extrabold text-center text-blue-700 tracking-tight">
+            {/* Header estilo AppSheet: izquierda + acento */}
+            <div className="border-l-4 border-blue-700 pl-3">
+              <h2 className="text-[26px] font-extrabold text-left text-slate-900 tracking-tight leading-tight">
+                Desafíos
+              </h2>
 
-            Desafíos
-          </h2>
+              <p className="text-sm text-left text-slate-500 mt-1 font-semibold">
+                Pendientes · Aceptados · Jugados
+              </p>
+            </div>
 
-          <p className="text-sm text-center text-slate-500 mt-1 font-medium">
-            Pendientes · Aceptados · Jugados
-          </p>
+            {/* ...tu contenido debajo queda igual */}
+          </section>
 
           <div className="mt-6 space-y-3">
             {loading && <p className="text-xs text-slate-400">Cargando Desafios</p>}
