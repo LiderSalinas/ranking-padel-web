@@ -43,14 +43,17 @@ const Row: React.FC<{
 
 const RankingMenu: React.FC<Props> = ({ onSelect }) => {
   return (
-    <div className="min-h-[calc(100vh-120px)] bg-slate-100 text-slate-900">
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        <header className="mb-4">
-          <h2 className="text-lg font-semibold text-slate-900">Ranking</h2>
-          <p className="text-xs text-slate-500 mt-1">
-            Selecciona el grupo de clasificación. Se muestran posiciones por pareja.
-          </p>
-        </header>
+      <header className="mb-4">
+      <div className="border-l-4 border-blue-700 pl-3">
+        <h2 className="text-[26px] font-extrabold text-left text-slate-900 tracking-tight leading-tight">
+          Ranking
+        </h2>
+
+        <p className="text-sm text-left text-slate-500 mt-1 font-semibold">
+          Selecciona el grupo. Se muestran posiciones por pareja.
+        </p>
+      </div>
+
 
         <div className="space-y-5">
           <section>
