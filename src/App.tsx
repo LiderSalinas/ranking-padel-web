@@ -358,15 +358,20 @@ const DesafiosView: React.FC<{
     return mapaParejas.get(id) ?? `Pareja ${id}`;
   };
 
- // ✅ permisos (NUEVO): retador y desafiado pueden gestionar
-  const canManage = (d: Desafio) =>
+  // ✅ PERMISOS POR ROL (cliente):
+  // DESAFIADO(retada): aceptar, rechazar, reprogramar, cargar resultado
+  // RETADOR(retadora): reprogramar, cargar resultado
+  const isParticipant = (d: Desafio) =>
     !!miDupla?.id &&
     (d.retada_pareja_id === miDupla.id || d.retadora_pareja_id === miDupla.id);
 
-  // ✅ resultado: cualquiera de las 2 parejas del partido
-  const canLoadResult = (d: Desafio) =>
-    !!miDupla?.id &&
-    (d.retada_pareja_id === miDupla.id || d.retadora_pareja_id === miDupla.id);
+  const isDesafiado = (d: Desafio) =>
+    !!miDupla?.id && d.retada_pareja_id === miDupla.id;
+
+  const canAccept = (d: Desafio) => isDesafiado(d);      // SOLO retada
+  const canReject = (d: Desafio) => isDesafiado(d);      // SOLO retada
+  const canReprogram = (d: Desafio) => isParticipant(d); // ambos
+  const canLoadResult = (d: Desafio) => isParticipant(d); // ambos
 
   const handleCrearChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -446,8 +451,8 @@ const DesafiosView: React.FC<{
   const handleAceptar = async (d: Desafio) => {
     try {
       setError(null);
-      if (!canManage(d)) {
-        throw new Error("Solo las parejas del partido pueden gestionar este desafío.");
+      if (!canAccept(d)) {
+        throw new Error("Solo la dupla desafiada puede aceptar este desafío.");
       }
       await aceptarDesafio(d.id);
       await cargarDesafios();
@@ -460,7 +465,7 @@ const DesafiosView: React.FC<{
   const handleRechazar = async (d: Desafio) => {
     try {
       setError(null);
-      if (!canManage(d)) {
+      if (!canReject(d)) {
         throw new Error("Solo la dupla desafiada puede rechazar este desafío.");
       }
       await rechazarDesafio(d.id);
@@ -487,8 +492,8 @@ const DesafiosView: React.FC<{
   };
 
   const abrirReprogramar = (d: Desafio) => {
-    if (!canManage(d)) {
-      alert("Solo la dupla desafiada puede reprogramar.");
+    if (!canReprogram(d)) {
+      alert("Solo las parejas del partido pueden reprogramar.");
       return;
     }
     setReprogramarTarget(d);
@@ -507,8 +512,8 @@ const DesafiosView: React.FC<{
       setReprogramando(true);
       setError(null);
 
-      if (!canManage(reprogramarTarget)) {
-        throw new Error("Solo la dupla desafiada puede reprogramar.");
+      if (!canReprogram(reprogramarTarget)) {
+        throw new Error("Solo las parejas del partido pueden reprogramar.");
       }
 
       if (!formReprogramar.fecha || !formReprogramar.hora) {
@@ -701,17 +706,17 @@ const DesafiosView: React.FC<{
           </div>
         </header>
 
-              <section className="bg-white rounded-2xl shadow-sm p-6 mt-2">
-            {/* Header estilo AppSheet: izquierda + acento */}
-            <div className="border-l-4 border-blue-700 pl-3">
-              <h2 className="text-[26px] font-extrabold text-left text-slate-900 tracking-tight leading-tight">
-                Desafíos
-              </h2>
+        <section className="bg-white rounded-2xl shadow-sm p-6 mt-2">
+          {/* Header estilo AppSheet: izquierda + acento */}
+          <div className="border-l-4 border-blue-700 pl-3">
+            <h2 className="text-[26px] font-extrabold text-left text-slate-900 tracking-tight leading-tight">
+              Desafíos
+            </h2>
 
-              <p className="text-sm text-left text-slate-500 mt-1 font-semibold">
-                Pendientes · Aceptados · Jugados
-              </p>
-            </div>
+            <p className="text-sm text-left text-slate-500 mt-1 font-semibold">
+              Pendientes · Aceptados · Jugados
+            </p>
+          </div>
 
           <div className="mt-6 space-y-3">
             {loading && <p className="text-xs text-slate-400">Cargando Desafios</p>}
@@ -737,13 +742,13 @@ const DesafiosView: React.FC<{
                   "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition active:scale-[0.98]";
 
                 // ✅ NUEVO: si soy parte del partido (retador o desafiado)
-                const esParteDelPartido =
-                  !!miDupla?.id &&
-                  (d.retadora_pareja_id === miDupla.id || d.retada_pareja_id === miDupla.id);
+                const esParteDelPartido = isParticipant(d);
 
-                // permisos ya existentes
-                const manage = canManage(d);
-                const loadResult = canLoadResult(d);
+                // permisos finales
+                const canA = canAccept(d);
+                const canRj = canReject(d);
+                const canRp = canReprogram(d);
+                const canRes = canLoadResult(d);
 
                 return (
                   <div
@@ -775,38 +780,45 @@ const DesafiosView: React.FC<{
                       <BadgeEstado estado={d.estado} />
 
                       <div className="flex flex-wrap justify-end gap-2">
-                        {/* ✅ Acciones solo si sos parte del partido */}
-                        {d.estado === "Pendiente" && esParteDelPartido && manage && (
+                        {/* ✅ Pendiente */}
+                        {d.estado === "Pendiente" && esParteDelPartido && (
                           <>
-                            <button
-                              onClick={() => handleAceptar(d)}
-                              className={`${btnBase} bg-sky-600 text-white hover:bg-sky-700`}
-                              title="Aceptar"
-                            >
-                              ✅ <span>Aceptar</span>
-                            </button>
+                            {canA && (
+                              <button
+                                onClick={() => handleAceptar(d)}
+                                className={`${btnBase} bg-sky-600 text-white hover:bg-sky-700`}
+                                title="Aceptar"
+                              >
+                                ✅ <span>Aceptar</span>
+                              </button>
+                            )}
 
-                            <button
-                              onClick={() => handleRechazar(d)}
-                              className={`${btnBase} border border-orange-300 text-orange-700 hover:bg-orange-50`}
-                              title="Rechazar"
-                            >
-                              ❌ <span>Rechazar</span>
-                            </button>
+                            {canRj && (
+                              <button
+                                onClick={() => handleRechazar(d)}
+                                className={`${btnBase} border border-orange-300 text-orange-700 hover:bg-orange-50`}
+                                title="Rechazar"
+                              >
+                                ❌ <span>Rechazar</span>
+                              </button>
+                            )}
 
-                            <button
-                              onClick={() => abrirReprogramar(d)}
-                              className={`${btnBase} border border-indigo-300 text-indigo-700 hover:bg-indigo-50`}
-                              title="Reprogramar"
-                            >
-                              🗓️ <span>Repro</span>
-                            </button>
+                            {canRp && (
+                              <button
+                                onClick={() => abrirReprogramar(d)}
+                                className={`${btnBase} border border-indigo-300 text-indigo-700 hover:bg-indigo-50`}
+                                title="Reprogramar"
+                              >
+                                🗓️ <span>Repro</span>
+                              </button>
+                            )}
                           </>
                         )}
 
+                        {/* ✅ Aceptado */}
                         {d.estado === "Aceptado" && esParteDelPartido && (
                           <>
-                            {loadResult && (
+                            {canRes && (
                               <button
                                 onClick={() => abrirModalResultado(d)}
                                 className={`${btnBase} bg-emerald-600 text-white hover:bg-emerald-700`}
@@ -816,24 +828,24 @@ const DesafiosView: React.FC<{
                               </button>
                             )}
 
-                            {manage && (
-                              <>
-                                <button
-                                  onClick={() => abrirReprogramar(d)}
-                                  className={`${btnBase} border border-indigo-300 text-indigo-700 hover:bg-indigo-50`}
-                                  title="Reprogramar"
-                                >
-                                  🗓️ <span>Repro</span>
-                                </button>
+                            {canRp && (
+                              <button
+                                onClick={() => abrirReprogramar(d)}
+                                className={`${btnBase} border border-indigo-300 text-indigo-700 hover:bg-indigo-50`}
+                                title="Reprogramar"
+                              >
+                                🗓️ <span>Repro</span>
+                              </button>
+                            )}
 
-                                <button
-                                  onClick={() => handleRechazar(d)}
-                                  className={`${btnBase} border border-orange-300 text-orange-700 hover:bg-orange-50`}
-                                  title="Rechazar"
-                                >
-                                  ❌ <span>Rechazar</span>
-                                </button>
-                              </>
+                            {canRj && (
+                              <button
+                                onClick={() => handleRechazar(d)}
+                                className={`${btnBase} border border-orange-300 text-orange-700 hover:bg-orange-50`}
+                                title="Rechazar"
+                              >
+                                ❌ <span>Rechazar</span>
+                              </button>
                             )}
                           </>
                         )}
@@ -879,7 +891,7 @@ const DesafiosView: React.FC<{
             </div>
 
             <p className="text-xs text-slate-500 mb-3">
-              Solo la dupla desafiada puede reprogramar.
+              Solo las parejas del partido pueden reprogramar.
             </p>
 
             <form onSubmit={handleSubmitReprogramar} className="space-y-3">
@@ -1051,37 +1063,43 @@ const DesafiosView: React.FC<{
 
             <div className="px-6 py-4 border-t border-slate-100 bg-white">
               <div className="flex flex-wrap gap-2 justify-end">
-                {desafioDetalle.estado === "Pendiente" && canManage(desafioDetalle) && (
+                {desafioDetalle.estado === "Pendiente" && isParticipant(desafioDetalle) && (
                   <>
-                    <button
-                      onClick={async () => {
-                        await handleAceptar(desafioDetalle);
-                        cerrarDetalle();
-                      }}
-                      className="rounded-full bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700"
-                    >
-                      Aceptar
-                    </button>
+                    {canAccept(desafioDetalle) && (
+                      <button
+                        onClick={async () => {
+                          await handleAceptar(desafioDetalle);
+                          cerrarDetalle();
+                        }}
+                        className="rounded-full bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700"
+                      >
+                        Aceptar
+                      </button>
+                    )}
 
-                    <button
-                      onClick={async () => {
-                        await handleRechazar(desafioDetalle);
-                        cerrarDetalle();
-                      }}
-                      className="rounded-full border border-orange-300 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-50"
-                    >
-                      Rechazar
-                    </button>
+                    {canReject(desafioDetalle) && (
+                      <button
+                        onClick={async () => {
+                          await handleRechazar(desafioDetalle);
+                          cerrarDetalle();
+                        }}
+                        className="rounded-full border border-orange-300 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-50"
+                      >
+                        Rechazar
+                      </button>
+                    )}
 
-                    <button
-                      onClick={() => {
-                        abrirReprogramar(desafioDetalle);
-                        cerrarDetalle();
-                      }}
-                      className="rounded-full border border-indigo-300 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50"
-                    >
-                      Reprogramar
-                    </button>
+                    {canReprogram(desafioDetalle) && (
+                      <button
+                        onClick={() => {
+                          abrirReprogramar(desafioDetalle);
+                          cerrarDetalle();
+                        }}
+                        className="rounded-full border border-indigo-300 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50"
+                      >
+                        Reprogramar
+                      </button>
+                    )}
                   </>
                 )}
 
@@ -1098,7 +1116,20 @@ const DesafiosView: React.FC<{
                         Cargar resultado
                       </button>
                     )}
-                    {canManage(desafioDetalle) && (
+
+                    {canReprogram(desafioDetalle) && (
+                      <button
+                        onClick={() => {
+                          abrirReprogramar(desafioDetalle);
+                          cerrarDetalle();
+                        }}
+                        className="rounded-full border border-indigo-300 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50"
+                      >
+                        Reprogramar
+                      </button>
+                    )}
+
+                    {canReject(desafioDetalle) && (
                       <button
                         onClick={async () => {
                           await handleRechazar(desafioDetalle);
@@ -1114,7 +1145,7 @@ const DesafiosView: React.FC<{
 
                 {(desafioDetalle.estado === "Jugado" ||
                   desafioDetalle.estado === "Rechazado" ||
-                  (!canManage(desafioDetalle) &&
+                  (!isParticipant(desafioDetalle) &&
                     (desafioDetalle.estado === "Pendiente" || desafioDetalle.estado === "Aceptado"))) && (
                   <button
                     onClick={cerrarDetalle}
