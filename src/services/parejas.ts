@@ -16,8 +16,14 @@ export async function getParejasDesafiables(
   const g = (grupo || "").trim();
   const qs = g ? `?grupo=${encodeURIComponent(g)}` : "";
 
-  // ✅ ENDPOINT CORRECTO (NO es /desafios/*)
-  const data = await request<any[]>(`/parejas/desafiables${qs}`, { method: "GET" });
+  let data: any[] = [];
+  try {
+    // ✅ ENDPOINT CORRECTO (NO es /desafios/*)
+    data = await request<any[]>(`/parejas/desafiables${qs}`, { method: "GET" });
+  } catch (err: any) {
+    console.error("❌ Error en /parejas/desafiables:", err);
+    throw err;
+  }
 
   const out: ParejaDesafiable[] = [];
   const seen = new Set<number>();

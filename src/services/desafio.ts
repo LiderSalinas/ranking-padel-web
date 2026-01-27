@@ -9,7 +9,7 @@ export interface CrearDesafioPayload {
 
   retada_pareja_id: number;
   fecha: string; // "YYYY-MM-DD"
-  hora: string;  // "H" | "HH" | "H:MM" | "HH:MM" | "HH:MM:SS" -> se fuerza HH:00:00
+  hora: string; // "H" | "HH" | "H:MM" | "HH:MM" | "HH:MM:SS" -> se fuerza HH:00:00
   observacion?: string | null;
 }
 
@@ -31,6 +31,15 @@ function horaRedonda(hora: string): string {
   return `${hh}:00:00`;
 }
 
+// ✅ guard: normaliza id (evita romper si viene string)
+function normalizeId(id: number): number {
+  const n = Number(id);
+  if (!Number.isFinite(n) || n <= 0) {
+    throw new Error("ID inválido del desafío.");
+  }
+  return n;
+}
+
 // --------- listar desafíos del jugador autenticado ---------
 export async function getMisProximosDesafios(): Promise<Desafio[]> {
   return request<Desafio[]>("/desafios/mis-proximos");
@@ -47,8 +56,28 @@ export async function getProximosDesafios(): Promise<Desafio[]> {
 }
 
 // --------- obtener desafío por ID ---------
+// ✅ FIX: si no sos parte del desafío (403), cae a /publico para el MURO
 export async function getDesafioById(id: number): Promise<Desafio> {
-  return request<Desafio>(`/desafios/${id}`);
+  const safeId = normalizeId(id);
+
+  try {
+    return await request<Desafio>(`/desafios/${safeId}`);
+  } catch (err: any) {
+    const msg = String(err?.message || "").toLowerCase();
+
+    // tu request() suele tirar Error con message del backend.
+    // Si es 403 / "no tenés acceso", usamos endpoint público.
+    if (
+      msg.includes("403") ||
+      msg.includes("forbidden") ||
+      msg.includes("no tenés acceso") ||
+      msg.includes("no tienes acceso")
+    ) {
+      return request<Desafio>(`/desafios/${safeId}/publico`);
+    }
+
+    throw err;
+  }
 }
 
 // --------- crear desafío ---------
@@ -69,11 +98,13 @@ export async function crearDesafio(payload: CrearDesafioPayload): Promise<Desafi
 
 // --------- aceptar / rechazar ---------
 export async function aceptarDesafio(id: number): Promise<Desafio> {
-  return request<Desafio>(`/desafios/${id}/aceptar`, { method: "POST" });
+  const safeId = normalizeId(id);
+  return request<Desafio>(`/desafios/${safeId}/aceptar`, { method: "POST" });
 }
 
 export async function rechazarDesafio(id: number): Promise<Desafio> {
-  return request<Desafio>(`/desafios/${id}/rechazar`, { method: "POST" });
+  const safeId = normalizeId(id);
+  return request<Desafio>(`/desafios/${safeId}/rechazar`, { method: "POST" });
 }
 
 // --------- reprogramar desafío ---------
@@ -86,12 +117,14 @@ export async function reprogramarDesafio(
   id: number,
   payload: ReprogramarDesafioPayload
 ): Promise<Desafio> {
+  const safeId = normalizeId(id);
+
   const body = {
     fecha: payload.fecha,
     hora: horaRedonda(payload.hora),
   };
 
-  return request<Desafio>(`/desafios/${id}/reprogramar`, {
+  return request<Desafio>(`/desafios/${safeId}/reprogramar`, {
     method: "PATCH",
     body: JSON.stringify(body),
   });
@@ -128,7 +161,8 @@ export type CargarResultadoPayload = {
 export async function cargarResultadoDesafio(
   payload: CargarResultadoPayload
 ): Promise<Desafio> {
-  const { desafio_id, ...body } = payload;
+  const desafio_id = normalizeId(payload.desafio_id);
+  const { desafio_id: _omit, ...body } = payload;
 
   return request<Desafio>(`/desafios/${desafio_id}/resultado`, {
     method: "POST",
@@ -137,10 +171,7 @@ export async function cargarResultadoDesafio(
 }
 
 /* =========================================================
-   ✅ NUEVO (pedido cliente): "Muro" para que TODOS vean
-   - Partidos por jugar (global): /desafios/proximos
-   - Partidos ya jugados (al menos del usuario): /desafios/mis-desafios
-   (Si mañana agregás endpoint de jugados global, lo enchufamos acá)
+   ✅ MURO GLOBAL: viene directo del backend
 ========================================================= */
 
 // helper: timestamp para ordenar "más reciente primero"
@@ -148,14 +179,12 @@ function desafioTime(d: Desafio): number {
   const hora = (d.hora || "00:00:00").slice(0, 8);
 
   const fj = (d as any).fecha_jugado as string | undefined;
-  const baseFecha =
-    d.estado === "Jugado" && fj && fj.trim() ? fj : d.fecha;
+  const baseFecha = d.estado === "Jugado" && fj && fj.trim() ? fj : d.fecha;
 
   return new Date(`${baseFecha}T${hora}`).getTime();
 }
 
-// ✅ Muro: combina global por jugar + mis jugados, sin duplicar
-// ✅ MURO GLOBAL: viene directo del backend
+// ✅ Muro: viene del backend (/desafios/muro)
 export async function getMuroDesafios(): Promise<Desafio[]> {
   return request<Desafio[]>("/desafios/muro");
 }
