@@ -95,7 +95,6 @@ const JugadoresView: React.FC<Props> = ({ onLogout }) => {
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Jugadores</h2>
             <p className="text-xs text-slate-500 mt-1">
-              Vista tipo AppSheet: cards por pareja con stats y accesos rápidos.
             </p>
           </div>
 

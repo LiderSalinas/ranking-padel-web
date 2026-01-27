@@ -40,6 +40,28 @@ function normalizeId(id: number): number {
   return n;
 }
 
+// ✅ helper: detecta 403 de forma robusta (porque request() puede variar)
+function isForbiddenError(err: any): boolean {
+  const msg = String(err?.message || "").toLowerCase();
+  const detail = String(err?.detail || "").toLowerCase();
+
+  // algunos request() exponen status
+  const status = Number(err?.status ?? err?.status_code ?? err?.response?.status ?? NaN);
+
+  if (status === 403) return true;
+
+  // fallback por texto
+  const text = `${msg} ${detail}`;
+  return (
+    text.includes("403") ||
+    text.includes("forbidden") ||
+    text.includes("no tenés acceso") ||
+    text.includes("no tienes acceso") ||
+    text.includes("sin permiso") ||
+    text.includes("not allowed")
+  );
+}
+
 // --------- listar desafíos del jugador autenticado ---------
 export async function getMisProximosDesafios(): Promise<Desafio[]> {
   return request<Desafio[]>("/desafios/mis-proximos");
@@ -63,19 +85,10 @@ export async function getDesafioById(id: number): Promise<Desafio> {
   try {
     return await request<Desafio>(`/desafios/${safeId}`);
   } catch (err: any) {
-    const msg = String(err?.message || "").toLowerCase();
-
-    // tu request() suele tirar Error con message del backend.
-    // Si es 403 / "no tenés acceso", usamos endpoint público.
-    if (
-      msg.includes("403") ||
-      msg.includes("forbidden") ||
-      msg.includes("no tenés acceso") ||
-      msg.includes("no tienes acceso")
-    ) {
+    // ✅ detección robusta
+    if (isForbiddenError(err)) {
       return request<Desafio>(`/desafios/${safeId}/publico`);
     }
-
     throw err;
   }
 }
@@ -136,7 +149,10 @@ export type MiDuplaResponse = {
   etiqueta: string; // "Nombre Apellido / Nombre Apellido"
   nombre?: string | null;
   grupo?: string | null;
+
+  // ✅ algunos backends mandan "posicion", otros "posicion_actual"
   posicion?: number | null;
+  posicion_actual?: number | null;
 };
 
 export async function getMiDupla(): Promise<MiDuplaResponse> {

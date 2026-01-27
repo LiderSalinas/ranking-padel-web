@@ -133,7 +133,7 @@ const RankingView: React.FC<Props> = ({ grupo, genero, onBack }) => {
           <div>
             <h2 className="text-lg font-semibold text-slate-900">{titulo}</h2>
             <p className="text-xs text-slate-500 mt-1">
-              Posiciones actuales por pareja, con récord y cuota. Modelo AppSheet.
+              Posiciones actuales por pareja.
             </p>
           </div>
 

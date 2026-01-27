@@ -18,7 +18,7 @@ import {
   rechazarDesafio,
   reprogramarDesafio,
   getMiDupla, // ✅ NUEVO
-  getMuroDesafios, // ✅ NUEVO: muro (global por jugar + mis jugados)
+  getMuroDesafios, // ✅ NUEVO: muro (global)
 } from "./services/desafio";
 import { getParejasDesafiables } from "./services/parejas";
 import Login from "./views/Auth/Login";
@@ -156,7 +156,7 @@ const DesafiosView: React.FC<{
     etiqueta?: string;
     nombre?: string;
     grupo?: string | null;
-    posicion_actual?: number | null; // ✅ IMPORTANTE para regla ±3
+    posicion_actual?: number | null; // ✅ IMPORTANTE para regla 3 arriba
   } | null>(null);
 
   const [showCrear, setShowCrear] = useState(false);
@@ -171,9 +171,7 @@ const DesafiosView: React.FC<{
 
   const [showReprogramar, setShowReprogramar] = useState(false);
   const [reprogramando, setReprogramando] = useState(false);
-  const [reprogramarTarget, setReprogramarTarget] = useState<Desafio | null>(
-    null
-  );
+  const [reprogramarTarget, setReprogramarTarget] = useState<Desafio | null>(null);
   const [formReprogramar, setFormReprogramar] = useState({
     fecha: "",
     hora: "",
@@ -192,11 +190,10 @@ const DesafiosView: React.FC<{
       setLoading(true);
       setError(null);
 
-      // ✅ MURO (global por jugar + mis jugados)
+      // ✅ MURO GLOBAL: acá deben venir TODOS los partidos (por jugar + jugados + etc.)
       const data = await getMuroDesafios();
 
-      // ✅ Orden: MÁS RECIENTE primero (ya viene ordenado desde el service,
-      // pero dejamos un sort defensivo por si acaso)
+      // ✅ Orden: MÁS RECIENTE primero (defensivo)
       const dt = (x: Desafio) => {
         const hora = (x.hora || "00:00:00").slice(0, 8);
         const fj = (x as any).fecha_jugado as string | undefined;
@@ -309,12 +306,12 @@ const DesafiosView: React.FC<{
     return parejas.filter((p) => categoriaFromGrupo(p.grupo) === myCat);
   }, [parejas, miDupla?.grupo]);
 
-  // ✅ regla del cliente: solo 3 arriba y 3 abajo (±3)
+  // ✅ REGLA (CLIENTE): solo 3 puestos arriba (NO ±3)
+  // - “Arriba” = mejor puesto = número menor
+  // - Ej: si estoy #10, puedo desafiar #9 #8 #7 (máximo 3 arriba)
   const parejasPorRegla = useMemo(() => {
-    const myPos =
-      (miDupla?.posicion_actual ?? null) as number | null;
+    const myPos = (miDupla?.posicion_actual ?? null) as number | null;
 
-    // si no sabemos tu posición, no podemos filtrar por regla (pero luego validamos en submit)
     if (!myPos) return parejasFiltradas;
 
     return parejasFiltradas.filter((p) => {
@@ -324,8 +321,11 @@ const DesafiosView: React.FC<{
       // excluye a tu propia dupla
       if (String(p.id) === String(miDupla?.id)) return false;
 
-      // ±3
-      return Math.abs(Number(pos) - Number(myPos)) <= 3;
+      const targetPos = Number(pos);
+      const mine = Number(myPos);
+
+      // solo arriba: targetPos < mine y diferencia <= 3
+      return targetPos < mine && (mine - targetPos) <= 3;
     });
   }, [parejasFiltradas, miDupla?.posicion_actual, miDupla?.id]);
 
@@ -365,7 +365,7 @@ const DesafiosView: React.FC<{
   // ✅ permisos: solo el DESAFIADO puede aceptar/rechazar/reprogramar
   const canManage = (d: Desafio) => !!miDupla?.id && d.retada_pareja_id === miDupla.id;
 
-  // ✅ resultado: (recomendado) cualquiera de las 2 parejas del partido
+  // ✅ resultado: cualquiera de las 2 parejas del partido
   const canLoadResult = (d: Desafio) =>
     !!miDupla?.id &&
     (d.retada_pareja_id === miDupla.id || d.retadora_pareja_id === miDupla.id);
@@ -401,20 +401,24 @@ const DesafiosView: React.FC<{
         throw new Error("No podés desafiar a tu misma dupla.");
       }
 
-      // ✅ validación dura de la regla ±3 antes de enviar
+      // ✅ validación dura: solo 3 puestos arriba
       const myPos = miDupla.posicion_actual ?? null;
-      const target = parejasFiltradas.find((p) => String(p.id) === String(formCrear.retada_pareja_id));
+      const target = parejasFiltradas.find(
+        (p) => String(p.id) === String(formCrear.retada_pareja_id)
+      );
       const targetPos =
         (target as any)?.posicion_actual ?? (target as any)?.posicion ?? null;
 
       if (myPos && targetPos && Number.isFinite(myPos) && Number.isFinite(targetPos)) {
-        const diff = Math.abs(Number(targetPos) - Number(myPos));
-        if (diff > 3) {
-          throw new Error("Regla: solo podés desafiar hasta 3 puestos arriba o 3 abajo (±3).");
+        const mine = Number(myPos);
+        const tp = Number(targetPos);
+
+        // debe ser arriba (tp < mine) y máximo 3
+        if (!(tp < mine && (mine - tp) <= 3)) {
+          throw new Error("Regla: solo podés desafiar hasta 3 puestos arriba.");
         }
       } else {
-        // si faltan posiciones, no rompemos, pero avisamos (mejor que explote en backend)
-        console.warn("No hay posiciones para validar regla ±3 (myPos/targetPos).");
+        console.warn("No hay posiciones para validar regla (myPos/targetPos).");
       }
 
       // ✅ NO mandamos retadora (backend la toma del token)
@@ -610,6 +614,16 @@ const DesafiosView: React.FC<{
     };
   };
 
+  // ✅ Título para el recuadro del modal (retadora VS retada)
+  const tituloCrear = useMemo(() => {
+    const retadora = miDupla?.etiqueta || miDupla?.nombre || "Tu dupla";
+    const retada =
+      (parejaRetadaSeleccionada as any)?.etiqueta ||
+      (parejaRetadaSeleccionada as any)?.nombre ||
+      (formCrear.retada_pareja_id ? "Dupla seleccionada" : "Seleccionar...");
+    return `${retadora} VS ${retada}`;
+  }, [miDupla?.etiqueta, miDupla?.nombre, parejaRetadaSeleccionada, formCrear.retada_pareja_id]);
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 pb-16">
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
@@ -697,7 +711,7 @@ const DesafiosView: React.FC<{
         <section className="bg-white rounded-2xl shadow-sm p-6 mt-2">
           <h2 className="text-lg font-semibold text-center">Muro de desafíos</h2>
           <p className="text-xs text-center text-slate-500 mt-1">
-            Se muestran desafíos por jugar (global) y jugados (tuyos), ordenados por lo más reciente.
+            Se muestran todos los desafíos del sistema, ordenados por lo más reciente.
           </p>
 
           <div className="mt-6 space-y-3">
@@ -723,9 +737,6 @@ const DesafiosView: React.FC<{
                 const btnBase =
                   "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition active:scale-[0.98]";
 
-                const manage = canManage(d);
-                const loadResult = canLoadResult(d);
-
                 return (
                   <div
                     key={d.id}
@@ -744,87 +755,16 @@ const DesafiosView: React.FC<{
                         </p>
                       )}
 
-                      {d.estado === "Jugado" && (
-                        <p className="text-[11px] text-emerald-700 mt-1">
-                          ✅ Resultado cargado
-                        </p>
-                      )}
-
-                      {!manage && (d.estado === "Pendiente" || d.estado === "Aceptado") && (
-                        <p className="text-[10px] text-slate-400 mt-1">
-                          Solo lectura (solo la dupla desafiada puede aceptar/rechazar/reprogramar).
-                        </p>
-                      )}
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        Modo muro: solo lectura (ver detalle).
+                      </p>
                     </div>
 
                     <div className="flex flex-col items-end gap-2">
                       <BadgeEstado estado={d.estado} />
 
+                      {/* ✅ MURO SOLO LECTURA: SOLO DETALLE */}
                       <div className="flex flex-wrap justify-end gap-2">
-                        {d.estado === "Pendiente" && manage && (
-                          <>
-                            <button
-                              onClick={() => handleAceptar(d)}
-                              className={`${btnBase} bg-sky-600 text-white hover:bg-sky-700`}
-                              title="Aceptar"
-                            >
-                              ✅ <span>Aceptar</span>
-                            </button>
-
-                            <button
-                              onClick={() => handleRechazar(d)}
-                              className={`${btnBase} border border-orange-300 text-orange-700 hover:bg-orange-50`}
-                              title="Rechazar"
-                            >
-                              ❌ <span>Rechazar</span>
-                            </button>
-
-                            <button
-                              onClick={() => abrirReprogramar(d)}
-                              className={`${btnBase} border border-indigo-300 text-indigo-700 hover:bg-indigo-50`}
-                              title="Reprogramar"
-                            >
-                              🗓️ <span>Repro</span>
-                            </button>
-                          </>
-                        )}
-
-                        {d.estado === "Aceptado" && (
-                          <>
-                            {loadResult && (
-                              <button
-                                onClick={() => abrirModalResultado(d)}
-                                className={`${btnBase} bg-emerald-600 text-white hover:bg-emerald-700`}
-                                title="Cargar resultado"
-                              >
-                                🏆 <span>Resultado</span>
-                              </button>
-                            )}
-
-                            {manage && (
-                              <button
-                                onClick={() => handleRechazar(d)}
-                                className={`${btnBase} border border-orange-300 text-orange-700 hover:bg-orange-50`}
-                                title="Rechazar"
-                              >
-                                ❌ <span>Rechazar</span>
-                              </button>
-                            )}
-                          </>
-                        )}
-
-                        {d.estado === "Rechazado" && (
-                          <span className="text-[11px] text-slate-400">
-                            Desafío rechazado
-                          </span>
-                        )}
-
-                        {d.estado === "Jugado" && (
-                          <span className="text-[11px] text-emerald-700">
-                            Partido jugado
-                          </span>
-                        )}
-
                         <button
                           onClick={async () => {
                             setDesafioDetalle(d);
@@ -1129,19 +1069,19 @@ const DesafiosView: React.FC<{
               </button>
             </div>
 
-            {/* Hint de regla */}
+            {/* ✅ ACÁ VA EL TÍTULO + TU PUESTO (SIN REGLA) */}
             <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] space-y-1">
-              <p className="text-slate-600">
-                Regla: podés desafiar solo <span className="font-semibold">3 puestos arriba</span> y{" "}
-                <span className="font-semibold">3 puestos abajo</span> (±3).
+              <p className="text-slate-700 font-semibold">
+                {tituloCrear}
               </p>
+
               {miDupla?.posicion_actual ? (
                 <p className="text-slate-500">
                   Tu posición: <span className="font-semibold">#{miDupla.posicion_actual}</span>
                 </p>
               ) : (
                 <p className="text-slate-400">
-                  (No se detectó tu posición; si pasa, revisá que /desafios/mi-dupla devuelva posicion_actual)
+                  (No se detectó tu posición; revisá que /desafios/mi-dupla devuelva posicion_actual)
                 </p>
               )}
             </div>
@@ -1190,13 +1130,13 @@ const DesafiosView: React.FC<{
                   {miDupla?.grupo && (
                     <p className="mt-1 text-[10px] text-slate-400">
                       Mostrando parejas de:{" "}
-                      <span className="font-semibold">{miDupla.grupo}</span> (±3 por regla)
+                      <span className="font-semibold">{miDupla.grupo}</span>
                     </p>
                   )}
 
                   {miDupla?.id && opcionesParejas.length === 0 && (
                     <p className="mt-1 text-[10px] text-red-500">
-                      No hay parejas disponibles dentro de ±3 posiciones.
+                      No hay parejas disponibles dentro de 3 puestos arriba.
                     </p>
                   )}
                 </div>
