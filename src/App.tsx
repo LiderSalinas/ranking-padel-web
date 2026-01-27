@@ -358,8 +358,10 @@ const DesafiosView: React.FC<{
     return mapaParejas.get(id) ?? `Pareja ${id}`;
   };
 
-  // ✅ permisos: solo el DESAFIADO puede aceptar/rechazar/reprogramar
-  const canManage = (d: Desafio) => !!miDupla?.id && d.retada_pareja_id === miDupla.id;
+ // ✅ permisos (NUEVO): retador y desafiado pueden gestionar
+  const canManage = (d: Desafio) =>
+    !!miDupla?.id &&
+    (d.retada_pareja_id === miDupla.id || d.retadora_pareja_id === miDupla.id);
 
   // ✅ resultado: cualquiera de las 2 parejas del partido
   const canLoadResult = (d: Desafio) =>
@@ -445,7 +447,7 @@ const DesafiosView: React.FC<{
     try {
       setError(null);
       if (!canManage(d)) {
-        throw new Error("Solo la dupla desafiada puede aceptar este desafío.");
+        throw new Error("Solo las parejas del partido pueden gestionar este desafío.");
       }
       await aceptarDesafio(d.id);
       await cargarDesafios();
@@ -847,15 +849,6 @@ const DesafiosView: React.FC<{
                           🔎 <span>Detalle</span>
                         </button>
                       </div>
-
-                      {/* ✅ Mensaje aclaratorio si sos parte pero NO podés gestionar */}
-                      {esParteDelPartido &&
-                        (d.estado === "Pendiente" || d.estado === "Aceptado") &&
-                        !manage && (
-                          <p className="text-[10px] text-slate-400 text-right">
-                            Solo la dupla desafiada puede aceptar/rechazar/reprogramar.
-                          </p>
-                        )}
                     </div>
                   </div>
                 );
