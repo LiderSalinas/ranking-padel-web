@@ -307,8 +307,6 @@ const DesafiosView: React.FC<{
   }, [parejas, miDupla?.grupo]);
 
   // ✅ REGLA (CLIENTE): solo 3 puestos arriba (NO ±3)
-  // - “Arriba” = mejor puesto = número menor
-  // - Ej: si estoy #10, puedo desafiar #9 #8 #7 (máximo 3 arriba)
   const parejasPorRegla = useMemo(() => {
     const myPos = (miDupla?.posicion_actual ?? null) as number | null;
 
@@ -318,13 +316,11 @@ const DesafiosView: React.FC<{
       const pos = (p as any).posicion_actual ?? (p as any).posicion ?? null;
       if (!pos || !Number.isFinite(pos)) return false;
 
-      // excluye a tu propia dupla
       if (String(p.id) === String(miDupla?.id)) return false;
 
       const targetPos = Number(pos);
       const mine = Number(myPos);
 
-      // solo arriba: targetPos < mine y diferencia <= 3
       return targetPos < mine && (mine - targetPos) <= 3;
     });
   }, [parejasFiltradas, miDupla?.posicion_actual, miDupla?.id]);
@@ -401,7 +397,6 @@ const DesafiosView: React.FC<{
         throw new Error("No podés desafiar a tu misma dupla.");
       }
 
-      // ✅ validación dura: solo 3 puestos arriba
       const myPos = miDupla.posicion_actual ?? null;
       const target = parejasFiltradas.find(
         (p) => String(p.id) === String(formCrear.retada_pareja_id)
@@ -413,7 +408,6 @@ const DesafiosView: React.FC<{
         const mine = Number(myPos);
         const tp = Number(targetPos);
 
-        // debe ser arriba (tp < mine) y máximo 3
         if (!(tp < mine && (mine - tp) <= 3)) {
           throw new Error("Regla: solo podés desafiar hasta 3 puestos arriba.");
         }
@@ -421,7 +415,6 @@ const DesafiosView: React.FC<{
         console.warn("No hay posiciones para validar regla (myPos/targetPos).");
       }
 
-      // ✅ NO mandamos retadora (backend la toma del token)
       await crearDesafio({
         retada_pareja_id: Number(formCrear.retada_pareja_id),
         fecha: formCrear.fecha,
@@ -542,7 +535,6 @@ const DesafiosView: React.FC<{
     (p) => String(p.id) === formCrear.retada_pareja_id
   );
 
-  // ✅ CORRECCIÓN: tu tipo real trae posicion_actual
   const puestoEnJuego =
     miDupla?.id && parejaRetadaSeleccionada
       ? Math.min(
@@ -614,7 +606,6 @@ const DesafiosView: React.FC<{
     };
   };
 
-  // ✅ Título para el recuadro del modal (retadora VS retada)
   const tituloCrear = useMemo(() => {
     const retadora = miDupla?.etiqueta || miDupla?.nombre || "Tu dupla";
     const retada =
@@ -737,6 +728,15 @@ const DesafiosView: React.FC<{
                 const btnBase =
                   "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition active:scale-[0.98]";
 
+                // ✅ NUEVO: si soy parte del partido (retador o desafiado)
+                const esParteDelPartido =
+                  !!miDupla?.id &&
+                  (d.retadora_pareja_id === miDupla.id || d.retada_pareja_id === miDupla.id);
+
+                // permisos ya existentes
+                const manage = canManage(d);
+                const loadResult = canLoadResult(d);
+
                 return (
                   <div
                     key={d.id}
@@ -755,16 +755,82 @@ const DesafiosView: React.FC<{
                         </p>
                       )}
 
-                      <p className="text-[10px] text-slate-400 mt-1">
-                        Modo muro: solo lectura (ver detalle).
-                      </p>
+                      {/* ✅ Solo lectura SOLO si NO sos parte */}
+                      {!esParteDelPartido && (
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          Modo muro: solo lectura (ver detalle).
+                        </p>
+                      )}
                     </div>
 
                     <div className="flex flex-col items-end gap-2">
                       <BadgeEstado estado={d.estado} />
 
-                      {/* ✅ MURO SOLO LECTURA: SOLO DETALLE */}
                       <div className="flex flex-wrap justify-end gap-2">
+                        {/* ✅ Acciones solo si sos parte del partido */}
+                        {d.estado === "Pendiente" && esParteDelPartido && manage && (
+                          <>
+                            <button
+                              onClick={() => handleAceptar(d)}
+                              className={`${btnBase} bg-sky-600 text-white hover:bg-sky-700`}
+                              title="Aceptar"
+                            >
+                              ✅ <span>Aceptar</span>
+                            </button>
+
+                            <button
+                              onClick={() => handleRechazar(d)}
+                              className={`${btnBase} border border-orange-300 text-orange-700 hover:bg-orange-50`}
+                              title="Rechazar"
+                            >
+                              ❌ <span>Rechazar</span>
+                            </button>
+
+                            <button
+                              onClick={() => abrirReprogramar(d)}
+                              className={`${btnBase} border border-indigo-300 text-indigo-700 hover:bg-indigo-50`}
+                              title="Reprogramar"
+                            >
+                              🗓️ <span>Repro</span>
+                            </button>
+                          </>
+                        )}
+
+                        {d.estado === "Aceptado" && esParteDelPartido && (
+                          <>
+                            {loadResult && (
+                              <button
+                                onClick={() => abrirModalResultado(d)}
+                                className={`${btnBase} bg-emerald-600 text-white hover:bg-emerald-700`}
+                                title="Cargar resultado"
+                              >
+                                🏆 <span>Resultado</span>
+                              </button>
+                            )}
+
+                            {manage && (
+                              <>
+                                <button
+                                  onClick={() => abrirReprogramar(d)}
+                                  className={`${btnBase} border border-indigo-300 text-indigo-700 hover:bg-indigo-50`}
+                                  title="Reprogramar"
+                                >
+                                  🗓️ <span>Repro</span>
+                                </button>
+
+                                <button
+                                  onClick={() => handleRechazar(d)}
+                                  className={`${btnBase} border border-orange-300 text-orange-700 hover:bg-orange-50`}
+                                  title="Rechazar"
+                                >
+                                  ❌ <span>Rechazar</span>
+                                </button>
+                              </>
+                            )}
+                          </>
+                        )}
+
+                        {/* ✅ Detalle siempre */}
                         <button
                           onClick={async () => {
                             setDesafioDetalle(d);
@@ -781,6 +847,15 @@ const DesafiosView: React.FC<{
                           🔎 <span>Detalle</span>
                         </button>
                       </div>
+
+                      {/* ✅ Mensaje aclaratorio si sos parte pero NO podés gestionar */}
+                      {esParteDelPartido &&
+                        (d.estado === "Pendiente" || d.estado === "Aceptado") &&
+                        !manage && (
+                          <p className="text-[10px] text-slate-400 text-right">
+                            Solo la dupla desafiada puede aceptar/rechazar/reprogramar.
+                          </p>
+                        )}
                     </div>
                   </div>
                 );
@@ -1040,7 +1115,8 @@ const DesafiosView: React.FC<{
 
                 {(desafioDetalle.estado === "Jugado" ||
                   desafioDetalle.estado === "Rechazado" ||
-                  (!canManage(desafioDetalle) && (desafioDetalle.estado === "Pendiente" || desafioDetalle.estado === "Aceptado"))) && (
+                  (!canManage(desafioDetalle) &&
+                    (desafioDetalle.estado === "Pendiente" || desafioDetalle.estado === "Aceptado"))) && (
                   <button
                     onClick={cerrarDetalle}
                     className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
@@ -1069,11 +1145,8 @@ const DesafiosView: React.FC<{
               </button>
             </div>
 
-            {/* ✅ ACÁ VA EL TÍTULO + TU PUESTO (SIN REGLA) */}
             <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] space-y-1">
-              <p className="text-slate-700 font-semibold">
-                {tituloCrear}
-              </p>
+              <p className="text-slate-700 font-semibold">{tituloCrear}</p>
 
               {miDupla?.posicion_actual ? (
                 <p className="text-slate-500">
