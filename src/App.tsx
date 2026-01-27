@@ -45,10 +45,12 @@ function snapToHour(value: string): string {
   return `${hh}:00`;
 }
 
-// ✅ NUEVO: weekday en español + formato “Miércoles 21 / 18:00 hs”
+// ✅ weekday en español + mes: “Miércoles 28 de Ene · 21:00 hs”
 function formatFechaJugadoBonita(fechaYYYYMMDD: string, horaHHMM: string): string {
   try {
-    const d = new Date(`${fechaYYYYMMDD}T00:00:00`);
+    const [y, m, d] = (fechaYYYYMMDD || "").split("-").map(Number);
+    const dt = new Date(y, (m || 1) - 1, d || 1);
+
     const dias = [
       "Domingo",
       "Lunes",
@@ -58,12 +60,17 @@ function formatFechaJugadoBonita(fechaYYYYMMDD: string, horaHHMM: string): strin
       "Viernes",
       "Sábado",
     ];
-    const label = dias[d.getDay()];
-    const dia = d.getDate().toString();
+    const meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
+    const label = dias[dt.getDay()];
+    const dia = dt.getDate().toString();
+    const mes = meses[dt.getMonth()];
+
     const hhmm = (horaHHMM || "00:00").slice(0, 5);
-    return `${label} ${dia} / ${hhmm} hs`;
+
+    return `${label} ${dia} de ${mes} · ${hhmm} hs`;
   } catch {
-    return `${fechaYYYYMMDD} / ${(horaHHMM || "00:00").slice(0, 5)} hs`;
+    return `${fechaYYYYMMDD} · ${(horaHHMM || "00:00").slice(0, 5)} hs`;
   }
 }
 
@@ -352,6 +359,16 @@ const DesafiosView: React.FC<{
 
     return `${d.retadora_pareja_id} vs ${d.retada_pareja_id}`;
   };
+
+  // ✅ NUEVO: partir "A VS B" en 2 líneas para mostrar VS centrado con barras
+  function splitTituloVs(titulo: string): { a: string; b: string } {
+    const t = (titulo || "").trim();
+    const parts = t.split(/\s+vs\s+|\s+VS\s+/i);
+    if (parts.length >= 2) {
+      return { a: parts[0].trim(), b: parts.slice(1).join(" VS ").trim() };
+    }
+    return { a: t, b: "" };
+  }
 
   const labelPareja = (id: number | null | undefined): string => {
     if (!id) return "—";
@@ -750,15 +767,36 @@ const DesafiosView: React.FC<{
                 const canRp = canReprogram(d);
                 const canRes = canLoadResult(d);
 
+                const { a, b } = splitTituloVs(tituloUI);
+
                 return (
                   <div
                     key={d.id}
                     className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="min-w-0">
-                      <h3 className={`text-[13px] font-semibold mb-1 truncate ${tituloCls}`}>
-                        {tituloUI}
-                      </h3>
+                      {/* ✅ TITULO: 2 líneas + VS centrado con barras, TODO del color del estado */}
+                      <div className="mb-1">
+                        <div className={`text-[16px] font-extrabold leading-snug ${tituloCls} truncate`}>
+                          {a}
+                        </div>
+
+                        {b ? (
+                          <div className="flex items-center gap-2 my-1">
+                            <div className="h-px bg-slate-200 flex-1" />
+                            <div className={`text-[12px] font-black tracking-widest ${tituloCls}`}>
+                              VS
+                            </div>
+                            <div className="h-px bg-slate-200 flex-1" />
+                          </div>
+                        ) : null}
+
+                        {b ? (
+                          <div className={`text-[16px] font-extrabold leading-snug ${tituloCls} truncate`}>
+                            {b}
+                          </div>
+                        ) : null}
+                      </div>
 
                       <p className={`text-[11px] ${fechaInfo.cls}`}>{fechaInfo.label}</p>
 
