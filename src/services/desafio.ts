@@ -155,23 +155,9 @@ function desafioTime(d: Desafio): number {
 }
 
 // ✅ Muro: combina global por jugar + mis jugados, sin duplicar
+// ✅ MURO GLOBAL: viene directo del backend
 export async function getMuroDesafios(): Promise<Desafio[]> {
-  const [proximos, mis] = await Promise.all([
-    getProximosDesafios(),
-    getMisDesafios(),
-  ]);
-
-  // de mis, tomamos los Jugados (histórico)
-  const misJugados = (mis || []).filter((d) => d.estado === "Jugado");
-
-  // unir y deduplicar por id
-  const map = new Map<number, Desafio>();
-  for (const d of [...(proximos || []), ...misJugados]) {
-    map.set(d.id, d);
-  }
-
-  // ordenar por más reciente (jugados usan fecha_jugado si existe)
-  return Array.from(map.values()).sort((a, b) => desafioTime(b) - desafioTime(a));
+  return request<Desafio[]>("/desafios/muro");
 }
 
 // (opcional) si querés tu historial ordenado por muro

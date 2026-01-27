@@ -18,6 +18,7 @@ import {
   rechazarDesafio,
   reprogramarDesafio,
   getMiDupla, // ✅ NUEVO
+  getMuroDesafios, // ✅ NUEVO: muro (global por jugar + mis jugados)
 } from "./services/desafio";
 import { getParejasDesafiables } from "./services/parejas";
 import Login from "./views/Auth/Login";
@@ -26,7 +27,6 @@ import CargarResultado from "./CargarResultado";
 import RankingView from "./views/Ranking";
 import RankingMenu from "./views/RankingMenu";
 import JugadoresView from "./views/Jugadores";
-import { getMuroDesafios } from "./services/desafio";
 
 import {
   activarNotificacionesYGuardar,
@@ -36,8 +36,6 @@ import {
 } from "./push";
 
 import ForegroundToast from "./components/ForegroundToast";
-
-// Helper 1/12
 
 // ✅ NUEVO: “pegar” hora a :00
 function snapToHour(value: string): string {
@@ -111,7 +109,7 @@ function tituloColorByEstado(estado: Estado): string {
   return map[estado] || "text-slate-800";
 }
 
-// ✅ NUEVO: “Se jugará …” / “Se jugó …” (mis próximos desafíos)
+// ✅ NUEVO: “Se jugará …” / “Se jugó …”
 function buildFechaLinea(d: Desafio): { label: string; cls: string } {
   const hora = (d.hora || "00:00:00").slice(0, 5);
 
@@ -152,13 +150,13 @@ const DesafiosView: React.FC<{
 
   const [parejas, setParejas] = useState<ParejaDesafiable[]>([]);
 
-  // ✅ NUEVO: mi dupla (para mostrar bloqueado)
+  // ✅ mi dupla (id + grupo + posición)
   const [miDupla, setMiDupla] = useState<{
     id: number;
     etiqueta?: string;
     nombre?: string;
-    grupo?: string | null;     // ✅ NUEVO
-    posicion?: number | null;  // ✅ NUEVO
+    grupo?: string | null;
+    posicion_actual?: number | null; // ✅ IMPORTANTE para regla ±3
   } | null>(null);
 
   const [showCrear, setShowCrear] = useState(false);
@@ -194,27 +192,40 @@ const DesafiosView: React.FC<{
       setLoading(true);
       setError(null);
 
+      // ✅ MURO (global por jugar + mis jugados)
       const data = await getMuroDesafios();
 
-
-      // ✅ (3)(4) MURO: MÁS RECIENTE primero
-      // - Si Jugado y viene fecha_jugado: usar esa fecha para que "suba" al cargar resultado
-      // - Caso contrario: usar fecha programada (fecha/hora)
-      const toTime = (d: Desafio) => {
-        const hora = (d.hora || "00:00:00").slice(0, 8);
-
-        const fj = (d as any).fecha_jugado as string | undefined;
-        const baseFecha =
-          d.estado === "Jugado" && fj && fj.trim() ? fj : d.fecha;
-
-        return new Date(`${baseFecha}T${hora}`).getTime();
+      // ✅ Orden: MÁS RECIENTE primero (ya viene ordenado desde el service,
+      // pero dejamos un sort defensivo por si acaso)
+      const dt = (x: Desafio) => {
+        const hora = (x.hora || "00:00:00").slice(0, 8);
+        const fj = (x as any).fecha_jugado as string | undefined;
+        const fechaBase =
+          x.estado === "Jugado" && fj && fj.trim() ? fj : x.fecha;
+        return new Date(`${fechaBase}T${hora}`).getTime();
       };
 
-      const sorted = [...data].sort((a, b) => toTime(b) - toTime(a));
+      const order: Record<string, number> = {
+        Pendiente: 0,
+        Aceptado: 1,
+        Jugado: 2,
+        Rechazado: 3,
+      };
+
+      const sorted = [...data].sort((a, b) => {
+        const ta = dt(a);
+        const tb = dt(b);
+        if (tb !== ta) return tb - ta;
+
+        const oa = order[a.estado] ?? 99;
+        const ob = order[b.estado] ?? 99;
+        return oa - ob;
+      });
+
       setItems(sorted);
     } catch (err: any) {
       console.error(err);
-      setError(err?.message || "Error al cargar desafíos");
+      setError(err?.message || "Error al cargar el muro");
     } finally {
       setLoading(false);
     }
@@ -232,16 +243,21 @@ const DesafiosView: React.FC<{
   useEffect(() => {
     void cargarDesafios();
 
-    // ✅ Cargar mi dupla primero para saber el grupo y filtrar parejas bien
+    // ✅ cargar mi dupla (grupo y posición) + parejas filtradas por grupo
     (async () => {
       try {
         const d: any = await getMiDupla();
-        setMiDupla(d);
+        setMiDupla({
+          id: d.id,
+          etiqueta: d.etiqueta,
+          nombre: d.nombre,
+          grupo: d.grupo ?? null,
+          posicion_actual: (d.posicion_actual ?? d.posicion ?? null) as any,
+        });
 
         // opcional: guardo id en el form (compat interna)
         setFormCrear((p) => ({ ...p, retadora_pareja_id: String(d.id) }));
 
-        // ✅ cargo parejas filtradas por grupo real
         await cargarParejas(d?.grupo ?? null);
       } catch (e) {
         console.warn("No se pudo cargar mi dupla", e);
@@ -286,38 +302,40 @@ const DesafiosView: React.FC<{
     })();
   }, [openDesafioId, items, loading, clearOpenDesafio]);
 
-  // ✅ (2) filtro UI: misma categoría + ±3 posiciones (si existen posiciones)
+  // ✅ filtro UI para que no te muestre parejas de otra categoría (Masculino/Femenino)
   const parejasFiltradas = useMemo(() => {
     const myCat = categoriaFromGrupo(miDupla?.grupo);
+    if (!myCat) return parejas;
+    return parejas.filter((p) => categoriaFromGrupo(p.grupo) === myCat);
+  }, [parejas, miDupla?.grupo]);
+
+  // ✅ regla del cliente: solo 3 arriba y 3 abajo (±3)
+  const parejasPorRegla = useMemo(() => {
     const myPos =
-      (miDupla as any)?.posicion_actual ?? miDupla?.posicion ?? null;
+      (miDupla?.posicion_actual ?? null) as number | null;
 
-    let out = parejas;
+    // si no sabemos tu posición, no podemos filtrar por regla (pero luego validamos en submit)
+    if (!myPos) return parejasFiltradas;
 
-    // misma categoría (Masculino/Femenino)
-    if (myCat) {
-      out = out.filter((p) => categoriaFromGrupo(p.grupo) === myCat);
-    }
+    return parejasFiltradas.filter((p) => {
+      const pos = (p as any).posicion_actual ?? (p as any).posicion ?? null;
+      if (!pos || !Number.isFinite(pos)) return false;
 
-    // ±3 posiciones (arriba/abajo)
-    if (myPos != null) {
-      out = out.filter((p) => {
-        const pos = (p as any).posicion_actual ?? (p as any).posicion ?? null;
-        if (pos == null) return true; // si no viene, no bloqueamos para no romper
-        return Math.abs(pos - myPos) <= 3;
-      });
-    }
+      // excluye a tu propia dupla
+      if (String(p.id) === String(miDupla?.id)) return false;
 
-    return out;
-  }, [parejas, miDupla?.grupo, miDupla?.posicion]);
+      // ±3
+      return Math.abs(Number(pos) - Number(myPos)) <= 3;
+    });
+  }, [parejasFiltradas, miDupla?.posicion_actual, miDupla?.id]);
 
   const opcionesParejas = useMemo(
     () =>
-      parejasFiltradas.map((p) => ({
+      parejasPorRegla.map((p) => ({
         value: String(p.id),
         label: (p as any).etiqueta ?? (p as any).nombre ?? `Pareja ${p.id}`,
       })),
-    [parejasFiltradas]
+    [parejasPorRegla]
   );
 
   const mapaParejas = useMemo(() => {
@@ -344,13 +362,20 @@ const DesafiosView: React.FC<{
     return mapaParejas.get(id) ?? `Pareja ${id}`;
   };
 
+  // ✅ permisos: solo el DESAFIADO puede aceptar/rechazar/reprogramar
+  const canManage = (d: Desafio) => !!miDupla?.id && d.retada_pareja_id === miDupla.id;
+
+  // ✅ resultado: (recomendado) cualquiera de las 2 parejas del partido
+  const canLoadResult = (d: Desafio) =>
+    !!miDupla?.id &&
+    (d.retada_pareja_id === miDupla.id || d.retadora_pareja_id === miDupla.id);
+
   const handleCrearChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name } = e.target;
     let { value } = e.target;
 
-    // ✅ Hora redonda en Crear (por si llega algo raro)
     if (name === "hora") value = snapToHour(value);
 
     setFormCrear((prev) => ({ ...prev, [name]: value }));
@@ -363,7 +388,7 @@ const DesafiosView: React.FC<{
 
     try {
       if (!miDupla?.id) {
-        throw new Error("No se pudo cargar tu dupla retadora. Volvé a iniciar sesión.");
+        throw new Error("No se pudo cargar tu dupla. Volvé a iniciar sesión.");
       }
       if (!formCrear.retada_pareja_id) {
         throw new Error("Seleccioná la dupla desafiada.");
@@ -374,6 +399,22 @@ const DesafiosView: React.FC<{
 
       if (Number(formCrear.retada_pareja_id) === miDupla.id) {
         throw new Error("No podés desafiar a tu misma dupla.");
+      }
+
+      // ✅ validación dura de la regla ±3 antes de enviar
+      const myPos = miDupla.posicion_actual ?? null;
+      const target = parejasFiltradas.find((p) => String(p.id) === String(formCrear.retada_pareja_id));
+      const targetPos =
+        (target as any)?.posicion_actual ?? (target as any)?.posicion ?? null;
+
+      if (myPos && targetPos && Number.isFinite(myPos) && Number.isFinite(targetPos)) {
+        const diff = Math.abs(Number(targetPos) - Number(myPos));
+        if (diff > 3) {
+          throw new Error("Regla: solo podés desafiar hasta 3 puestos arriba o 3 abajo (±3).");
+        }
+      } else {
+        // si faltan posiciones, no rompemos, pero avisamos (mejor que explote en backend)
+        console.warn("No hay posiciones para validar regla ±3 (myPos/targetPos).");
       }
 
       // ✅ NO mandamos retadora (backend la toma del token)
@@ -403,10 +444,13 @@ const DesafiosView: React.FC<{
     }
   };
 
-  const handleAceptar = async (id: number) => {
+  const handleAceptar = async (d: Desafio) => {
     try {
       setError(null);
-      await aceptarDesafio(id);
+      if (!canManage(d)) {
+        throw new Error("Solo la dupla desafiada puede aceptar este desafío.");
+      }
+      await aceptarDesafio(d.id);
       await cargarDesafios();
     } catch (err: any) {
       console.error(err);
@@ -414,10 +458,13 @@ const DesafiosView: React.FC<{
     }
   };
 
-  const handleRechazar = async (id: number) => {
+  const handleRechazar = async (d: Desafio) => {
     try {
       setError(null);
-      await rechazarDesafio(id);
+      if (!canManage(d)) {
+        throw new Error("Solo la dupla desafiada puede rechazar este desafío.");
+      }
+      await rechazarDesafio(d.id);
       await cargarDesafios();
     } catch (err: any) {
       console.error(err);
@@ -426,6 +473,10 @@ const DesafiosView: React.FC<{
   };
 
   const abrirModalResultado = (d: Desafio) => {
+    if (!canLoadResult(d)) {
+      alert("Solo las parejas del partido pueden cargar el resultado.");
+      return;
+    }
     const tituloUI = construirTituloDesafio(d);
     const copia = { ...d, titulo_desafio: tituloUI };
     setDesafioSeleccionado(copia);
@@ -437,6 +488,10 @@ const DesafiosView: React.FC<{
   };
 
   const abrirReprogramar = (d: Desafio) => {
+    if (!canManage(d)) {
+      alert("Solo la dupla desafiada puede reprogramar.");
+      return;
+    }
     setReprogramarTarget(d);
     setFormReprogramar({
       fecha: d.fecha,
@@ -452,6 +507,10 @@ const DesafiosView: React.FC<{
     try {
       setReprogramando(true);
       setError(null);
+
+      if (!canManage(reprogramarTarget)) {
+        throw new Error("Solo la dupla desafiada puede reprogramar.");
+      }
 
       if (!formReprogramar.fecha || !formReprogramar.hora) {
         throw new Error("Completá fecha y hora.");
@@ -475,31 +534,16 @@ const DesafiosView: React.FC<{
     }
   };
 
-  const parejaRetadoraSeleccionada = parejasFiltradas.find(
-    (p) => String(p.id) === formCrear.retadora_pareja_id
-  );
   const parejaRetadaSeleccionada = parejasFiltradas.find(
     (p) => String(p.id) === formCrear.retada_pareja_id
   );
 
-  const etiquetaRetadora =
-    parejaRetadoraSeleccionada &&
-    ((parejaRetadoraSeleccionada as any).etiqueta ??
-      (parejaRetadoraSeleccionada as any).nombre ??
-      `Pareja ${parejaRetadoraSeleccionada.id}`);
-
-  const etiquetaRetada =
-    parejaRetadaSeleccionada &&
-    ((parejaRetadaSeleccionada as any).etiqueta ??
-      (parejaRetadaSeleccionada as any).nombre ??
-      `Pareja ${parejaRetadaSeleccionada.id}`);
-
-  // ✅ CORRECCIÓN: tu tipo real trae posicion_actual (no "posicion")
+  // ✅ CORRECCIÓN: tu tipo real trae posicion_actual
   const puestoEnJuego =
-    parejaRetadoraSeleccionada && parejaRetadaSeleccionada
+    miDupla?.id && parejaRetadaSeleccionada
       ? Math.min(
-          (parejaRetadoraSeleccionada as any).posicion_actual ?? 0,
-          (parejaRetadaSeleccionada as any).posicion_actual ?? 0
+          (miDupla.posicion_actual ?? 0) as any,
+          ((parejaRetadaSeleccionada as any).posicion_actual ?? 0) as any
         )
       : null;
 
@@ -526,7 +570,6 @@ const DesafiosView: React.FC<{
     };
   };
 
-  // ✅ NUEVO: resumen “6/4 – 4/6 – 10/8”
   const getResultadoResumen = (d: Desafio): string | null => {
     const sets = getSets(d);
     if (!sets) return null;
@@ -566,13 +609,6 @@ const DesafiosView: React.FC<{
       retada: { old: oldD, new: oldD },
     };
   };
-
-  // ✅ (6) Permisos para el MODAL detalle (solo UI)
-  const soyRetadorDet =
-    !!(miDupla?.id != null && desafioDetalle && desafioDetalle.retadora_pareja_id === miDupla.id);
-  const soyDesafiadoDet =
-    !!(miDupla?.id != null && desafioDetalle && desafioDetalle.retada_pareja_id === miDupla.id);
-  const soyParteDet = soyRetadorDet || soyDesafiadoDet;
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 pb-16">
@@ -661,11 +697,11 @@ const DesafiosView: React.FC<{
         <section className="bg-white rounded-2xl shadow-sm p-6 mt-2">
           <h2 className="text-lg font-semibold text-center">Muro de desafíos</h2>
           <p className="text-xs text-center text-slate-500 mt-1">
-            Se muestran desafíos por jugar y jugados, ordenados por lo más reciente.
+            Se muestran desafíos por jugar (global) y jugados (tuyos), ordenados por lo más reciente.
           </p>
 
           <div className="mt-6 space-y-3">
-            {loading && <p className="text-xs text-slate-400">Cargando desafíos…</p>}
+            {loading && <p className="text-xs text-slate-400">Cargando muro…</p>}
 
             {!loading && error && (
               <p className="text-sm text-red-500 text-center">{error}</p>
@@ -684,15 +720,11 @@ const DesafiosView: React.FC<{
                 const fechaInfo = buildFechaLinea(d);
                 const tituloCls = tituloColorByEstado(d.estado);
 
-                // ✅ (6) permisos UI por desafío
-                const soyRetador =
-                  miDupla?.id != null && d.retadora_pareja_id === miDupla.id;
-                const soyDesafiado =
-                  miDupla?.id != null && d.retada_pareja_id === miDupla.id;
-                const soyParte = soyRetador || soyDesafiado;
-
                 const btnBase =
                   "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition active:scale-[0.98]";
+
+                const manage = canManage(d);
+                const loadResult = canLoadResult(d);
 
                 return (
                   <div
@@ -717,51 +749,49 @@ const DesafiosView: React.FC<{
                           ✅ Resultado cargado
                         </p>
                       )}
+
+                      {!manage && (d.estado === "Pendiente" || d.estado === "Aceptado") && (
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          Solo lectura (solo la dupla desafiada puede aceptar/rechazar/reprogramar).
+                        </p>
+                      )}
                     </div>
 
                     <div className="flex flex-col items-end gap-2">
                       <BadgeEstado estado={d.estado} />
 
                       <div className="flex flex-wrap justify-end gap-2">
-                        {d.estado === "Pendiente" && (
+                        {d.estado === "Pendiente" && manage && (
                           <>
-                            {soyDesafiado ? (
-                              <>
-                                <button
-                                  onClick={() => handleAceptar(d.id)}
-                                  className={`${btnBase} bg-sky-600 text-white hover:bg-sky-700`}
-                                  title="Aceptar"
-                                >
-                                  ✅ <span>Aceptar</span>
-                                </button>
+                            <button
+                              onClick={() => handleAceptar(d)}
+                              className={`${btnBase} bg-sky-600 text-white hover:bg-sky-700`}
+                              title="Aceptar"
+                            >
+                              ✅ <span>Aceptar</span>
+                            </button>
 
-                                <button
-                                  onClick={() => handleRechazar(d.id)}
-                                  className={`${btnBase} border border-orange-300 text-orange-700 hover:bg-orange-50`}
-                                  title="Rechazar"
-                                >
-                                  ❌ <span>Rechazar</span>
-                                </button>
+                            <button
+                              onClick={() => handleRechazar(d)}
+                              className={`${btnBase} border border-orange-300 text-orange-700 hover:bg-orange-50`}
+                              title="Rechazar"
+                            >
+                              ❌ <span>Rechazar</span>
+                            </button>
 
-                                <button
-                                  onClick={() => abrirReprogramar(d)}
-                                  className={`${btnBase} border border-indigo-300 text-indigo-700 hover:bg-indigo-50`}
-                                  title="Reprogramar"
-                                >
-                                  🗓️ <span>Repro</span>
-                                </button>
-                              </>
-                            ) : (
-                              <span className="text-[11px] text-slate-400">
-                                Solo el desafiado puede aceptar / rechazar
-                              </span>
-                            )}
+                            <button
+                              onClick={() => abrirReprogramar(d)}
+                              className={`${btnBase} border border-indigo-300 text-indigo-700 hover:bg-indigo-50`}
+                              title="Reprogramar"
+                            >
+                              🗓️ <span>Repro</span>
+                            </button>
                           </>
                         )}
 
                         {d.estado === "Aceptado" && (
                           <>
-                            {soyParte ? (
+                            {loadResult && (
                               <button
                                 onClick={() => abrirModalResultado(d)}
                                 className={`${btnBase} bg-emerald-600 text-white hover:bg-emerald-700`}
@@ -769,15 +799,11 @@ const DesafiosView: React.FC<{
                               >
                                 🏆 <span>Resultado</span>
                               </button>
-                            ) : (
-                              <span className="text-[11px] text-slate-400">
-                                Partido aceptado (solo lectura)
-                              </span>
                             )}
 
-                            {soyDesafiado && (
+                            {manage && (
                               <button
-                                onClick={() => handleRechazar(d.id)}
+                                onClick={() => handleRechazar(d)}
                                 className={`${btnBase} border border-orange-300 text-orange-700 hover:bg-orange-50`}
                                 title="Rechazar"
                               >
@@ -839,7 +865,7 @@ const DesafiosView: React.FC<{
             </div>
 
             <p className="text-xs text-slate-500 mb-3">
-              Solo se puede cambiar fecha y hora (estado: Pendiente).
+              Solo la dupla desafiada puede reprogramar.
             </p>
 
             <form onSubmit={handleSubmitReprogramar} className="space-y-3">
@@ -1011,51 +1037,43 @@ const DesafiosView: React.FC<{
 
             <div className="px-6 py-4 border-t border-slate-100 bg-white">
               <div className="flex flex-wrap gap-2 justify-end">
-                {desafioDetalle.estado === "Pendiente" && (
+                {desafioDetalle.estado === "Pendiente" && canManage(desafioDetalle) && (
                   <>
-                    {soyDesafiadoDet ? (
-                      <>
-                        <button
-                          onClick={async () => {
-                            await handleAceptar(desafioDetalle.id);
-                            cerrarDetalle();
-                          }}
-                          className="rounded-full bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700"
-                        >
-                          Aceptar
-                        </button>
+                    <button
+                      onClick={async () => {
+                        await handleAceptar(desafioDetalle);
+                        cerrarDetalle();
+                      }}
+                      className="rounded-full bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700"
+                    >
+                      Aceptar
+                    </button>
 
-                        <button
-                          onClick={async () => {
-                            await handleRechazar(desafioDetalle.id);
-                            cerrarDetalle();
-                          }}
-                          className="rounded-full border border-orange-300 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-50"
-                        >
-                          Rechazar
-                        </button>
+                    <button
+                      onClick={async () => {
+                        await handleRechazar(desafioDetalle);
+                        cerrarDetalle();
+                      }}
+                      className="rounded-full border border-orange-300 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-50"
+                    >
+                      Rechazar
+                    </button>
 
-                        <button
-                          onClick={() => {
-                            abrirReprogramar(desafioDetalle);
-                            cerrarDetalle();
-                          }}
-                          className="rounded-full border border-indigo-300 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50"
-                        >
-                          Reprogramar
-                        </button>
-                      </>
-                    ) : (
-                      <span className="text-xs text-slate-400">
-                        Solo el desafiado puede aceptar / rechazar
-                      </span>
-                    )}
+                    <button
+                      onClick={() => {
+                        abrirReprogramar(desafioDetalle);
+                        cerrarDetalle();
+                      }}
+                      className="rounded-full border border-indigo-300 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50"
+                    >
+                      Reprogramar
+                    </button>
                   </>
                 )}
 
                 {desafioDetalle.estado === "Aceptado" && (
                   <>
-                    {soyParteDet ? (
+                    {canLoadResult(desafioDetalle) && (
                       <button
                         onClick={() => {
                           abrirModalResultado(desafioDetalle);
@@ -1065,16 +1083,11 @@ const DesafiosView: React.FC<{
                       >
                         Cargar resultado
                       </button>
-                    ) : (
-                      <span className="text-xs text-slate-400">
-                        Partido aceptado (solo lectura)
-                      </span>
                     )}
-
-                    {soyDesafiadoDet && (
+                    {canManage(desafioDetalle) && (
                       <button
                         onClick={async () => {
-                          await handleRechazar(desafioDetalle.id);
+                          await handleRechazar(desafioDetalle);
                           cerrarDetalle();
                         }}
                         className="rounded-full border border-orange-300 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-50"
@@ -1086,7 +1099,8 @@ const DesafiosView: React.FC<{
                 )}
 
                 {(desafioDetalle.estado === "Jugado" ||
-                  desafioDetalle.estado === "Rechazado") && (
+                  desafioDetalle.estado === "Rechazado" ||
+                  (!canManage(desafioDetalle) && (desafioDetalle.estado === "Pendiente" || desafioDetalle.estado === "Aceptado"))) && (
                   <button
                     onClick={cerrarDetalle}
                     className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
@@ -1115,26 +1129,24 @@ const DesafiosView: React.FC<{
               </button>
             </div>
 
-            {etiquetaRetadora && etiquetaRetada && (
-              <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] space-y-1">
-                <p className="flex items-center gap-1">
-                  <span className="text-pink-500">🔑</span>
-                  <span>
-                    {etiquetaRetadora} VS {etiquetaRetada}
-                  </span>
+            {/* Hint de regla */}
+            <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] space-y-1">
+              <p className="text-slate-600">
+                Regla: podés desafiar solo <span className="font-semibold">3 puestos arriba</span> y{" "}
+                <span className="font-semibold">3 puestos abajo</span> (±3).
+              </p>
+              {miDupla?.posicion_actual ? (
+                <p className="text-slate-500">
+                  Tu posición: <span className="font-semibold">#{miDupla.posicion_actual}</span>
                 </p>
-
-                {puestoEnJuego && (
-                  <p className="flex items-center gap-1 text-amber-700">
-                    <span>🏅</span>
-                    <span>Puesto en juego: N.º {puestoEnJuego}</span>
-                  </p>
-                )}
-              </div>
-            )}
+              ) : (
+                <p className="text-slate-400">
+                  (No se detectó tu posición; si pasa, revisá que /desafios/mi-dupla devuelva posicion_actual)
+                </p>
+              )}
+            </div>
 
             <form onSubmit={handleSubmitCrear} className="space-y-3">
-              {/* ✅ Retadora bloqueada + Desafiada seleccionable */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">
@@ -1147,7 +1159,6 @@ const DesafiosView: React.FC<{
                         <div className="text-sm font-semibold text-slate-900 truncate">
                           {miDupla?.etiqueta || miDupla?.nombre || "Cargando tu dupla..."}
                         </div>
-                        <div className="text-[11px] text-slate-500"></div>
                       </div>
                       <span className="text-[11px] font-semibold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-full">
                         🔒
@@ -1169,25 +1180,36 @@ const DesafiosView: React.FC<{
                     disabled={!miDupla?.id}
                   >
                     <option value="">Seleccionar…</option>
-                    {opcionesParejas
-                      .filter((p) => String(p.value) !== String(miDupla?.id))
-                      .map((p) => (
-                        <option key={p.value} value={p.value}>
-                          {p.label}
-                        </option>
-                      ))}
+                    {opcionesParejas.map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
                   </select>
 
-                  {/* ✅ hint sutil para que se entienda el filtro */}
                   {miDupla?.grupo && (
                     <p className="mt-1 text-[10px] text-slate-400">
                       Mostrando parejas de:{" "}
-                      <span className="font-semibold">{miDupla.grupo}</span>{" "}
-                      (±3 posiciones)
+                      <span className="font-semibold">{miDupla.grupo}</span> (±3 por regla)
+                    </p>
+                  )}
+
+                  {miDupla?.id && opcionesParejas.length === 0 && (
+                    <p className="mt-1 text-[10px] text-red-500">
+                      No hay parejas disponibles dentro de ±3 posiciones.
                     </p>
                   )}
                 </div>
               </div>
+
+              {puestoEnJuego && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px]">
+                  <span className="text-amber-700">🏅</span>{" "}
+                  <span className="text-slate-700">
+                    Puesto en juego: <span className="font-semibold">N.º {puestoEnJuego}</span>
+                  </span>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -1443,8 +1465,6 @@ const App: React.FC = () => {
             onClick={() => {
               setActiveTab("ranking");
               setRankingScreen("menu");
-
-              // ✅ CORRECCIÓN: resetea filtro a algo válido al entrar al tab ranking
               setRankingFilter({ genero: "M", grupo: "A" });
             }}
             className={`flex-1 py-2.5 flex flex-col items-center justify-center text-[11px] ${
