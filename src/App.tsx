@@ -701,10 +701,13 @@ const DesafiosView: React.FC<{
           </div>
         </header>
 
-        <section className="bg-white rounded-2xl shadow-sm p-6 mt-2">
-          <h2 className="text-lg font-semibold text-center">Desafios </h2>
-          <p className="text-xs text-center text-slate-500 mt-1">
-            Desafios Masculinos por Categoria.
+              <section className="bg-white rounded-2xl shadow-sm p-6 mt-2">
+          <h2 className="text-2xl font-extrabold text-center text-slate-900 tracking-tight">
+            Desafíos
+          </h2>
+
+          <p className="text-sm text-center text-slate-500 mt-1 font-medium">
+            Pendientes · Aceptados · Jugados
           </p>
 
           <div className="mt-6 space-y-3">
