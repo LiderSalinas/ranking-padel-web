@@ -43,21 +43,26 @@ const Row: React.FC<{
 
 const RankingMenu: React.FC<Props> = ({ onSelect }) => {
   return (
-      <header className="mb-4">
-      <div className="border-l-4 border-blue-700 pl-3">
-        <h2 className="text-[26px] font-extrabold text-left text-slate-900 tracking-tight leading-tight">
-          Ranking
-        </h2>
+    <div className="min-h-[calc(100vh-120px)] bg-slate-100 text-slate-900">
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        {/* Header estilo AppSheet */}
+        <header className="mb-4">
+          <div className="border-l-4 border-blue-700 pl-3">
+            <h2 className="text-[26px] font-extrabold text-left text-slate-900 tracking-tight leading-tight">
+              Ranking
+            </h2>
 
-        <p className="text-sm text-left text-slate-500 mt-1 font-semibold">
-          Selecciona el grupo. Se muestran posiciones por pareja.
-        </p>
-      </div>
-
+            <p className="text-sm text-left text-slate-500 mt-1 font-semibold">
+              Selecciona el grupo de clasificación. Se muestran posiciones por pareja.
+            </p>
+          </div>
+        </header>
 
         <div className="space-y-5">
           <section>
-            <h3 className="text-[13px] font-semibold text-slate-700 mb-2">Masculino</h3>
+            <h3 className="text-[13px] font-semibold text-slate-700 mb-2">
+              Masculino
+            </h3>
             <div className="space-y-3">
               <Row
                 title="Ranking Masculino A"
@@ -81,7 +86,9 @@ const RankingMenu: React.FC<Props> = ({ onSelect }) => {
           </section>
 
           <section>
-            <h3 className="text-[13px] font-semibold text-slate-700 mb-2">Femenino</h3>
+            <h3 className="text-[13px] font-semibold text-slate-700 mb-2">
+              Femenino
+            </h3>
             <div className="space-y-3">
               <Row
                 title="Ranking Femenino A"
@@ -104,7 +111,8 @@ const RankingMenu: React.FC<Props> = ({ onSelect }) => {
             </div>
 
             <p className="text-[11px] text-slate-400 mt-3">
-              Nota: si tu backend todavía no separa por género, por ahora se filtrará solo por grupo.
+              Nota: si tu backend todavía no separa por género, por ahora se filtrará
+              solo por grupo.
             </p>
           </section>
         </div>
