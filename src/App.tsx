@@ -713,9 +713,6 @@ const DesafiosView: React.FC<{
               </p>
             </div>
 
-            {/* ...tu contenido debajo queda igual */}
-          </section>
-
           <div className="mt-6 space-y-3">
             {loading && <p className="text-xs text-slate-400">Cargando Desafios</p>}
 
