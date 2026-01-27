@@ -3,27 +3,21 @@ import { request } from "./api";
 import type { ParejaDesafiable } from "../types/parejas";
 
 /**
- * ✅ Trae las parejas desafiables desde el backend (ya filtradas por reglas):
- * Endpoint: GET /desafios/parejas-desafiables
+ * Trae las parejas desafiables desde el backend.
+ * Endpoint REAL: GET /parejas/desafiables
  *
- * Reglas aplicadas en backend:
- * - Misma división: solo hasta 3 puestos arriba
- * - Interdivisión: Top 3 B -> últimas 3 A (+ especial 1B->18A)
- * - No cruza Masculino/Femenino
- *
- * Nota: el parámetro `grupo` queda por compat, pero el endpoint ya filtra.
+ * ✅ Soporta filtro opcional:
+ *   - grupo="Femenino" | "Masculino" (categoría)
+ *   - grupo="Femenino A" | "Masculino B" (exacto)
  */
 export async function getParejasDesafiables(
   grupo?: string | null
 ): Promise<ParejaDesafiable[]> {
-  // compat: si querés mantener la llamada igual, no rompe
-  // (el backend nuevo no usa este filtro)
-  const _g = (grupo || "").trim();
-  void _g;
+  const g = (grupo || "").trim();
+  const qs = g ? `?grupo=${encodeURIComponent(g)}` : "";
 
-  const data = await request<any[]>(`/desafios/parejas-desafiables`, {
-    method: "GET",
-  });
+  // ✅ ENDPOINT CORRECTO (NO es /desafios/*)
+  const data = await request<any[]>(`/parejas/desafiables${qs}`, { method: "GET" });
 
   const out: ParejaDesafiable[] = [];
   const seen = new Set<number>();
