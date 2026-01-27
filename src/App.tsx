@@ -702,7 +702,8 @@ const DesafiosView: React.FC<{
         </header>
 
               <section className="bg-white rounded-2xl shadow-sm p-6 mt-2">
-          <h2 className="text-2xl font-extrabold text-center text-slate-900 tracking-tight">
+          <h2 className="text-2xl font-extrabold text-center text-blue-700 tracking-tight">
+
             Desafíos
           </h2>
 
