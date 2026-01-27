@@ -702,7 +702,7 @@ const DesafiosView: React.FC<{
         </header>
 
         <section className="bg-white rounded-2xl shadow-sm p-6 mt-2">
-          <h2 className="text-lg font-semibold text-center">Muro de desafíos</h2>
+          <h2 className="text-lg font-semibold text-center">Desafios </h2>
           <p className="text-xs text-center text-slate-500 mt-1">
             Se muestran todos los desafíos del sistema, ordenados por lo más reciente.
           </p>
