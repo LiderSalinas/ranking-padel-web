@@ -109,11 +109,7 @@ const RankingMenu: React.FC<Props> = ({ onSelect }) => {
                 onClick={() => onSelect({ genero: "F", grupo: "C" })}
               />
             </div>
-
-            <p className="text-[11px] text-slate-400 mt-3">
-              Nota: si tu backend todavía no separa por género, por ahora se filtrará
-              solo por grupo.
-            </p>
+            
           </section>
         </div>
       </div>
