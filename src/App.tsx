@@ -704,7 +704,7 @@ const DesafiosView: React.FC<{
         <section className="bg-white rounded-2xl shadow-sm p-6 mt-2">
           <h2 className="text-lg font-semibold text-center">Desafios </h2>
           <p className="text-xs text-center text-slate-500 mt-1">
-            Se muestran todos los desafíos del sistema, ordenados por lo más reciente.
+            Desafios Masculinos por Categoria.
           </p>
 
           <div className="mt-6 space-y-3">
