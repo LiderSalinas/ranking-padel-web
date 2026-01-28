@@ -809,7 +809,6 @@ const DesafiosView: React.FC<{
                       {/* ✅ Solo lectura SOLO si NO sos parte */}
                       {!esParteDelPartido && (
                         <p className="text-[10px] text-slate-400 mt-1">
-                          Modo muro: solo lectura (ver detalle).
                         </p>
                       )}
                     </div>
