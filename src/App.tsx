@@ -567,6 +567,9 @@ const DesafiosView: React.FC<{
         )
       : null;
 
+  // ==========================
+  // ✅✅✅ FIX APLICADO ACÁ
+  // ==========================
   const getSets = (d: Desafio) => {
     const s1r = (d as any).set1_retador;
     const s1d = (d as any).set1_desafiado;
@@ -577,32 +580,37 @@ const DesafiosView: React.FC<{
 
     const has1 = Number.isFinite(s1r) && Number.isFinite(s1d);
     const has2 = Number.isFinite(s2r) && Number.isFinite(s2d);
-    const has3 =
-      (s3r !== null && s3r !== undefined) ||
-      (s3d !== null && s3d !== undefined);
+    const has3 = Number.isFinite(s3r) && Number.isFinite(s3d);
 
     if (!has1 && !has2 && !has3) return null;
 
     return {
       set1: has1 ? { r: s1r, d: s1d } : null,
       set2: has2 ? { r: s2r, d: s2d } : null,
-      set3: has3 ? { r: s3r ?? null, d: s3d ?? null } : null,
+      set3: has3 ? { r: s3r, d: s3d } : null,
     };
   };
 
-  const getResultadoResumen = (d: Desafio): string | null => {
+  const getResultadoResumen = (d: Desafio): string => {
     const sets = getSets(d);
-    if (!sets) return null;
 
+    // ✅ 1) si NO hay sets, pero está Jugado: mostrar algo útil
+    if (!sets) {
+      const obs = String(d.observacion || "").toLowerCase();
+      if (obs.includes("w.o") || obs.includes("wo")) return "W.O.";
+      if (d.estado === "Jugado") return "Resultado pendiente de carga";
+      return "—";
+    }
+
+    // ✅ 2) hay sets -> armar string
     const parts: string[] = [];
     if (sets.set1) parts.push(`${sets.set1.r}/${sets.set1.d}`);
     if (sets.set2) parts.push(`${sets.set2.r}/${sets.set2.d}`);
-    if (sets.set3 && (sets.set3.r !== null || sets.set3.d !== null)) {
-      parts.push(`${sets.set3.r ?? "—"}/${sets.set3.d ?? "—"}`);
-    }
+    if (sets.set3) parts.push(`${sets.set3.r}/${sets.set3.d}`);
 
-    return parts.length ? parts.join(" – ") : null;
+    return parts.length ? parts.join(" – ") : "—";
   };
+  // ==========================
 
   const getFechaJugadoLabelBonita = (d: Desafio) => {
     const fj = (d as any).fecha_jugado as string | undefined;
@@ -1029,7 +1037,8 @@ const DesafiosView: React.FC<{
                   <div className="mt-2 text-[12px] text-emerald-900 space-y-1">
                     <div>
                       <span className="font-semibold">Resultado:</span>{" "}
-                      {getResultadoResumen(desafioDetalle) ?? "—"}
+                      {/* ✅ FIX: ahora siempre devuelve string útil */}
+                      {getResultadoResumen(desafioDetalle)}
                     </div>
                     <div>
                       <span className="font-semibold">Fecha que se jugó:</span>{" "}
@@ -1565,6 +1574,7 @@ const App: React.FC = () => {
           >
             <span className="text-lg">👥</span>
             <span>Jugadores</span>
+            <span className="text-[10px]"> </span>
           </button>
 
           <button
